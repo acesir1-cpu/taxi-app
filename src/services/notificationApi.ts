@@ -1,0 +1,54 @@
+import type { AppNotification } from '../types/domain'
+import { delay } from './delay'
+import { getDb, persist } from './mockDb'
+
+function id(): string {
+  return `ntf-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+export async function getNotifications(accountId: string): Promise<AppNotification[]> {
+  await delay()
+  const db = getDb()
+  return db.notifications.filter((n) => n.accountId === accountId).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export async function addNotification(
+  accountId: string,
+  title: string,
+  body: string,
+  type: string
+): Promise<AppNotification> {
+  await delay(200)
+  const db = getDb()
+  const n: AppNotification = {
+    id: id(),
+    accountId,
+    title,
+    body,
+    read: false,
+    createdAt: new Date().toISOString(),
+    type,
+  }
+  db.notifications.unshift(n)
+  persist()
+  return n
+}
+
+export async function markNotificationRead(notificationId: string, accountId: string): Promise<void> {
+  await delay(150)
+  const db = getDb()
+  const n = db.notifications.find((x) => x.id === notificationId && x.accountId === accountId)
+  if (n) {
+    n.read = true
+    persist()
+  }
+}
+
+export async function markAllRead(accountId: string): Promise<void> {
+  await delay(150)
+  const db = getDb()
+  for (const n of db.notifications) {
+    if (n.accountId === accountId) n.read = true
+  }
+  persist()
+}

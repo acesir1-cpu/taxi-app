@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --app-shell-base: #e1e8f0;
+  }
+
+  html {
+    @apply antialiased text-brand-navy;
+    background-color: var(--app-shell-base);
+  }
+  body {
+    @apply min-h-screen overflow-x-hidden;
+  }
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+/* Leaflet z-index below modals */
+.leaflet-container {
+  font-family: inherit;
+  z-index: 0;
+}
+
+/* Welcome: blaga animacija pozadine + bokeh */
+@keyframes welcome-bg-drift {
+  0%,
+  100% {
+    transform: scale(1.06) translate(0%, 0%);
+  }
+  50% {
+    transform: scale(1.09) translate(-0.45%, 0.28%);
+  }
+}
+
+.welcome-bg-drift {
+  animation: welcome-bg-drift 32s ease-in-out infinite;
+}
+
+@keyframes welcome-bokeh {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.1;
+  }
+  50% {
+    transform: translate(14px, -12px) scale(1.06);
+    opacity: 0.16;
+  }
+}
+
+.animate-welcome-bokeh {
+  animation: welcome-bokeh 24s ease-in-out infinite;
+}
+
+.animate-welcome-bokeh-delayed {
+  animation: welcome-bokeh 28s ease-in-out infinite;
+  animation-delay: -9s;
+}
+
+/*
+ * Logged-in shell: urban “day” side of the brand — soft grid (map/streets),
+ * teal + navy glows, hint of taxi yellow, light edge depth. Keeps cards readable.
+ */
+.app-shell-atmosphere {
+  background-color: var(--app-shell-base);
+  background-image:
+    linear-gradient(rgba(7, 21, 39, 0.038) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7, 21, 39, 0.038) 1px, transparent 1px),
+    radial-gradient(ellipse 125% 90% at 50% 50%, transparent 52%, rgba(7, 21, 39, 0.045) 100%),
+    radial-gradient(ellipse 110% 58% at 50% -14%, rgba(20, 184, 166, 0.12), transparent 56%),
+    radial-gradient(ellipse 60% 48% at 100% 0%, rgba(7, 21, 39, 0.075), transparent 58%),
+    radial-gradient(ellipse 55% 42% at 0% 100%, rgba(255, 196, 0, 0.09), transparent 62%),
+    linear-gradient(165deg, rgba(255, 255, 255, 0.5) 0%, transparent 38%),
+    linear-gradient(180deg, #f0f6fc 0%, #e6ecf2 32%, #dde6f0 68%, #d5dfea 100%);
+  background-size:
+    40px 40px,
+    40px 40px,
+    auto,
+    auto,
+    auto,
+    auto,
+    auto,
+    auto;
+}
