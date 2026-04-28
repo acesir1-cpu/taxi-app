@@ -1,15 +1,4 @@
-# UrbanFlow Taxi — putnička aplikacija (MVP)
-
-Moderan frontend za naručivanje taksi vožnji u Sarajevu, s potpuno simuliranim backendom (`localStorage`, mock API, kašnjenja, GPS animacija).
-
-## Pokretanje
-
-```bash
-npm install
-npm run dev
-```
-
-Zatim otvorite URL koji Vite ispiše (obično `http://localhost:5173`).
+# UrbanFlow Taxi
 
 ## Demo pristup
 
