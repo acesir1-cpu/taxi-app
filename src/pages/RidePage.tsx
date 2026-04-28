@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
 import type { RideStatus } from '../types/domain'
 import { haversineKm } from '../utils/distance'
-import { pointAlongPolyline } from '../utils/route'
+import { interpolateRoute } from '../utils/route'
 import {
   cancelRide,
   confirmPassengerEnteredVehicle,
@@ -29,6 +29,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 
+type SimSpeed = 1 | 2 | 4 | 10
+
+function randomInRange(min: number, max: number) {
+  return min + Math.random() * (max - min)
+}
+
+function generateDriverStartNearPickup(pickup: { lat: number; lng: number }): { lat: number; lng: number } {
+  // Keep driver realistically near pickup: 0.2km to 3km.
+  for (let i = 0; i < 24; i++) {
+    const latOffset = randomInRange(-0.02, 0.02)
+    const lngOffset = randomInRange(-0.02, 0.02)
+    const candidate = {
+      lat: pickup.lat + latOffset,
+      lng: pickup.lng + lngOffset,
+    }
+    const dKm = haversineKm(candidate, pickup)
+    if (dKm >= 0.2 && dKm <= 3) return candidate
+  }
+  // Fallback should still be visibly away from pickup.
+  return {
+    lat: pickup.lat + 0.012,
+    lng: pickup.lng - 0.01,
+  }
+}
+
 export function RidePage() {
   const t = strings()
   const { id } = useParams()
@@ -38,7 +63,22 @@ export function RidePage() {
   const push = useToastStore((s) => s.push)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
-  const [demoOpen, setDemoOpen] = useState(false)
+  const [demoOpen, setDemoOpen] = useState(true)
+  const [simSpeed, setSimSpeed] = useState<SimSpeed>(1)
+  const [forcePending, setForcePending] = useState(false)
+  const [followTaxi, setFollowTaxi] = useState(true)
+  const [showArrivalPopup, setShowArrivalPopup] = useState(false)
+  const [driverPosSim, setDriverPosSim] = useState<{ lat: number; lng: number } | null>(null)
+  const [driverStartDistanceKm, setDriverStartDistanceKm] = useState<number | null>(null)
+  const rideMarkerRef = useRef<string | null>(null)
+  const driverOriginRef = useRef<{ lat: number; lng: number } | null>(null)
+  const animationFrameIdRef = useRef<number | null>(null)
+  const animCancelRef = useRef<(() => void) | null>(null)
+  const speedRef = useRef<SimSpeed>(1)
+  const speedCooldownUntilRef = useRef(0)
+  const simStatusRef = useRef<
+    'assigned' | 'driver_on_way' | 'driver_arrived' | 'ride_in_progress' | 'completed' | 'cancelled' | null
+  >(null)
 
   const rideQuery = useQuery({
     queryKey: ['ride', id],
@@ -46,7 +86,9 @@ export function RidePage() {
     enabled: !!id,
     refetchInterval: (q) => {
       const s = q.state.data?.status
-      return s && ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(s) ? 1200 : false
+      return s && ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(s)
+        ? Math.max(70, Math.round(1200 / simSpeed))
+        : false
     },
   })
 
@@ -66,91 +108,226 @@ export function RidePage() {
   })
 
   const driverPos = useMemo(() => {
+    if (driverPosSim) return driverPosSim
     if (!ride) return { lat: 43.856, lng: 18.41 }
     return {
       lat: ride.driverLat ?? ride.pickup.lat,
       lng: ride.driverLng ?? ride.pickup.lng,
     }
-  }, [ride])
+  }, [driverPosSim, ride])
+
+  useEffect(() => {
+    if (!rideId || !ride) return
+    if (rideMarkerRef.current !== rideId) {
+      rideMarkerRef.current = rideId
+      const existing = ride.driverLat != null && ride.driverLng != null
+        ? { lat: ride.driverLat, lng: ride.driverLng }
+        : null
+      const chosenStart = existing ?? generateDriverStartNearPickup(ride.pickup)
+      const dKm = haversineKm(chosenStart, ride.pickup)
+      const mustRegenerate = !existing || dKm < 0.2 || dKm > 3
+      const start = mustRegenerate ? generateDriverStartNearPickup(ride.pickup) : chosenStart
+      driverOriginRef.current = start
+      setDriverPosSim(start)
+      setDriverStartDistanceKm(haversineKm(start, ride.pickup))
+      if (mustRegenerate) {
+        void updateDriverSimPosition(rideId, start.lat, start.lng)
+      }
+    }
+  }, [ride, rideId])
 
   const distPickup = ride ? haversineKm(driverPos, ride.pickup) : 0
 
-  const advance = useMemo(
-    () => async (next: RideStatus) => {
-      if (!rideId) return
-      const res = await setRideStatus(rideId, next, me.account.id)
-      if ('error' in res) return
-      await qc.invalidateQueries({ queryKey: ['ride', rideId] })
-      await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
-    },
-    [me.account.id, me.profile.id, qc, rideId]
+  const scaledDelay = useMemo(
+    () => (baseMs: number) => Math.max(35, Math.round(baseMs / simSpeed)),
+    [simSpeed]
   )
 
   useEffect(() => {
-    if (!rideId || status !== 'dodijeljena') return
-    const t = window.setTimeout(() => {
-      void advance('vozac_na_putu')
-    }, 1000)
-    return () => clearTimeout(t)
-  }, [advance, rideId, status])
+    speedRef.current = simSpeed
+  }, [simSpeed])
 
-  useEffect(() => {
-    if (!rideId || status !== 'vozac_na_putu') return
+  function setSpeedSafe(next: SimSpeed) {
+    if (next === simSpeed) return
+    const now = Date.now()
+    if (now < speedCooldownUntilRef.current) return
+    speedCooldownUntilRef.current = now + 180
+    setSimSpeed(next)
+  }
+
+  function cancelActiveAnimation() {
+    animCancelRef.current?.()
+    animCancelRef.current = null
+    if (animationFrameIdRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameIdRef.current)
+      animationFrameIdRef.current = null
+    }
+  }
+
+  async function setRideStatusSafe(next: RideStatus) {
+    if (!rideId) return false
+    const res = await setRideStatus(rideId, next, me.account.id)
+    if ('error' in res) {
+      push(`${strings().common.error} (${res.error})`, 'error')
+      return false
+    }
+    await qc.invalidateQueries({ queryKey: ['ride', rideId] })
+    await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
+    return true
+  }
+
+  function animateMarkerAlongRoute(
+    routeCoordinates: Array<{ lat: number; lng: number }>,
+    onDone: () => void
+  ) {
+    if (routeCoordinates.length < 2) {
+      onDone()
+      return () => undefined
+    }
     let cancelled = false
-    ;(async () => {
-      const r = await qc.ensureQueryData({ queryKey: ['ride', rideId], queryFn: () => getRideById(rideId) })
-      if (!r || cancelled) return
-      const from = { lat: r.driverLat ?? r.pickup.lat, lng: r.driverLng ?? r.pickup.lng }
-      const to = r.pickup
-      const steps = 36
-      for (let i = 1; i <= steps; i++) {
-        if (cancelled) return
-        const t = i / steps
-        const lat = from.lat + (to.lat - from.lat) * t
-        const lng = from.lng + (to.lng - from.lng) * t
-        await updateDriverSimPosition(r.id, lat, lng)
-        await qc.invalidateQueries({ queryKey: ['ride', r.id] })
-        await new Promise((res) => setTimeout(res, 160))
-      }
+    let persistStamp = 0
+    const baseDuration = 30_000
+    let progress = 0
+    let lastTs = 0
+    const totalSegments = routeCoordinates.length - 1
+    const step = async (now: number) => {
       if (cancelled) return
-      await advance('stigao')
-    })()
+      if (!lastTs) {
+        lastTs = now
+      }
+      const delta = Math.max(0, now - lastTs)
+      lastTs = now
+      const progressDelta = (delta / baseDuration) * speedRef.current
+      progress = Math.min(1, progress + progressDelta)
+      const scaled = progress * totalSegments
+      const segIdx = Math.min(totalSegments - 1, Math.floor(scaled))
+      const segT = scaled - segIdx
+      const a = routeCoordinates[segIdx]!
+      const b = routeCoordinates[segIdx + 1]!
+      const lat = a.lat + (b.lat - a.lat) * segT
+      const lng = a.lng + (b.lng - a.lng) * segT
+      setDriverPosSim({ lat, lng })
+      if (now - persistStamp >= 450 && rideId) {
+        persistStamp = now
+        void updateDriverSimPosition(rideId, lat, lng)
+      }
+      if (progress >= 1) {
+        if (rideId) void updateDriverSimPosition(rideId, lat, lng)
+        animationFrameIdRef.current = null
+        onDone()
+        return
+      }
+      animationFrameIdRef.current = window.requestAnimationFrame(step)
+    }
+    animationFrameIdRef.current = window.requestAnimationFrame(step)
     return () => {
       cancelled = true
+      if (animationFrameIdRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameIdRef.current)
+        animationFrameIdRef.current = null
+      }
     }
-  }, [advance, qc, rideId, status])
+  }
+
+  function runDemoStatus(next: RideStatus) {
+    void (async () => {
+      if (!rideId || !ride || forcePending) return
+      setForcePending(true)
+      setShowArrivalPopup(false)
+      try {
+        if (next === 'vozac_na_putu') {
+          const origin = driverOriginRef.current ?? {
+            lat: ride.driverLat ?? ride.pickup.lat,
+            lng: ride.driverLng ?? ride.pickup.lng,
+          }
+          setDriverPosSim(origin)
+          await updateDriverSimPosition(rideId, origin.lat, origin.lng)
+          await setRideStatusSafe('vozac_na_putu')
+          return
+        }
+        if (next === 'stigao') {
+          cancelActiveAnimation()
+          setDriverPosSim({ lat: ride.pickup.lat, lng: ride.pickup.lng })
+          await updateDriverSimPosition(rideId, ride.pickup.lat, ride.pickup.lng)
+          const ok = await setRideStatusSafe('stigao')
+          if (ok) setShowArrivalPopup(true)
+          return
+        }
+        if (next === 'u_toku') {
+          cancelActiveAnimation()
+          setDriverPosSim({ lat: ride.pickup.lat, lng: ride.pickup.lng })
+          await updateDriverSimPosition(rideId, ride.pickup.lat, ride.pickup.lng)
+          await setRideStatusSafe('u_toku')
+          return
+        }
+        if (next === 'zavrsena') {
+          cancelActiveAnimation()
+          setDriverPosSim({ lat: ride.destination.lat, lng: ride.destination.lng })
+          await updateDriverSimPosition(rideId, ride.destination.lat, ride.destination.lng)
+          await setRideStatusSafe('zavrsena')
+        }
+      } finally {
+        setForcePending(false)
+      }
+    })()
+  }
 
   useEffect(() => {
-    if (!rideId || status !== 'u_toku') return
-    let cancelled = false
-    ;(async () => {
-      const r = await qc.ensureQueryData({ queryKey: ['ride', rideId], queryFn: () => getRideById(rideId) })
-      if (!r || cancelled) return
-      const pts = r.routePoints
-      const steps = 40
-      for (let i = 1; i <= steps; i++) {
-        if (cancelled) return
-        const t = i / steps
-        const p = pointAlongPolyline(pts, t)
-        await updateDriverSimPosition(r.id, p.lat, p.lng)
-        await qc.invalidateQueries({ queryKey: ['ride', r.id] })
-        await new Promise((res) => setTimeout(res, 180))
-      }
-      if (cancelled) return
-      await advance('zavrsena')
-      await qc.invalidateQueries({ queryKey: ['ride', r.id] })
-      await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
-      navigate(`/app/rate/${r.id}`, { replace: true })
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [advance, me.profile.id, navigate, qc, rideId, status])
+    if (!rideId || !ride || status !== 'dodijeljena') return
+    simStatusRef.current = 'assigned'
+    const timer = window.setTimeout(() => {
+      void setRideStatusSafe('vozac_na_putu')
+    }, scaledDelay(1000))
+    return () => clearTimeout(timer)
+  }, [ride, rideId, scaledDelay, status])
+
+  useEffect(() => {
+    if (!rideId || !ride || status !== 'vozac_na_putu') return
+    setShowArrivalPopup(false)
+    simStatusRef.current = 'driver_on_way'
+    cancelActiveAnimation()
+    const start = driverPosSim ?? driverOriginRef.current ?? { lat: ride.pickup.lat, lng: ride.pickup.lng }
+    const approach = interpolateRoute(start, ride.pickup, 64)
+    animCancelRef.current = animateMarkerAlongRoute(approach, () => {
+      void (async () => {
+        setDriverPosSim({ lat: ride.pickup.lat, lng: ride.pickup.lng })
+        await updateDriverSimPosition(rideId, ride.pickup.lat, ride.pickup.lng)
+        const ok = await setRideStatusSafe('stigao')
+        if (ok) {
+          simStatusRef.current = 'driver_arrived'
+          setShowArrivalPopup(true)
+        }
+      })()
+    })
+    return cancelActiveAnimation
+  }, [ride, rideId, status])
+
+  useEffect(() => {
+    if (status !== 'stigao') setShowArrivalPopup(false)
+  }, [status])
+
+  useEffect(() => {
+    if (!rideId || !ride || status !== 'u_toku') return
+    simStatusRef.current = 'ride_in_progress'
+    cancelActiveAnimation()
+    const path = ride.routePoints.length > 1 ? ride.routePoints : interpolateRoute(ride.pickup, ride.destination, 72)
+    animCancelRef.current = animateMarkerAlongRoute(path, () => {
+      void (async () => {
+        setDriverPosSim({ lat: ride.destination.lat, lng: ride.destination.lng })
+        await updateDriverSimPosition(rideId, ride.destination.lat, ride.destination.lng)
+        const ok = await setRideStatusSafe('zavrsena')
+        if (ok) simStatusRef.current = 'completed'
+      })()
+    })
+    return cancelActiveAnimation
+  }, [ride, rideId, status])
 
   useEffect(() => {
     if (status === 'zavrsena' && rideId) {
+      simStatusRef.current = 'completed'
       navigate(`/app/rate/${rideId}`, { replace: true })
     }
+    if (status === 'otkazana') simStatusRef.current = 'cancelled'
   }, [navigate, rideId, status])
 
   const cancelMut = useMutation({
@@ -189,9 +366,34 @@ export function RidePage() {
   return (
     <div className="space-y-4">
       <RideStatusBadge status={ride.status} />
-      <Suspense fallback={<MapChunkFallback className="min-h-72 sm:min-h-96" />}>
-        <ActiveRideMap ride={ride} driverPos={driverPos} />
-      </Suspense>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.ride.track}</p>
+          <Button
+            size="sm"
+            variant={followTaxi ? 'secondary' : 'outline'}
+            type="button"
+            onClick={() => setFollowTaxi((v) => !v)}
+          >
+            {followTaxi ? t.ride.followTaxiOn : t.ride.followTaxiOff}
+          </Button>
+        </div>
+        {driverStartDistanceKm != null ? (
+          <p className="text-xs font-medium text-slate-600">
+            {t.ride.distanceToYou} ~{driverStartDistanceKm.toFixed(1)} {t.ride.kmUnit}
+          </p>
+        ) : null}
+        <Suspense fallback={<MapChunkFallback className="min-h-72 sm:min-h-96" />}>
+          <ActiveRideMap
+            ride={ride}
+            driverPos={driverPos}
+            driverOrigin={driverOriginRef.current}
+            followDriver={followTaxi}
+            showArrivalPopup={showArrivalPopup}
+            arrivalPopupText={t.ride.driverArrived}
+          />
+        </Suspense>
+      </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -251,49 +453,122 @@ export function RidePage() {
         </Button>
       </div>
 
-      <motion.div layout className="rounded-2xl border border-dashed border-brand-border bg-white/80 p-3">
+      <motion.div layout className="rounded-2xl border border-amber-300 bg-amber-50/80 p-3 shadow-sm">
         <button
           type="button"
           className="flex w-full items-center justify-between text-sm font-semibold text-brand-navy"
           onClick={() => setDemoOpen((v) => !v)}
         >
-          {t.common.demoControls}
+          <span className="inline-flex items-center gap-2">
+            <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-extrabold tracking-wide text-amber-900">
+              DEMO
+            </span>
+            {t.common.demoControls}
+          </span>
           <span>{demoOpen ? '−' : '+'}</span>
         </button>
         {demoOpen ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Button size="sm" variant="secondary" type="button" onClick={() => void advance('stigao')}>
-              {t.common.forceArrived}
-            </Button>
-            <Button size="sm" variant="secondary" type="button" onClick={() => void advance('zavrsena')}>
-              {t.common.forceComplete}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              type="button"
-              onClick={() => {
-                setForceNoDrivers(true)
-                push(strings().order.noDrivers, 'info')
-              }}
-            >
-              {t.common.simNoDrivers}
-            </Button>
-            <Button
-              size="sm"
-              variant="danger"
-              type="button"
-              onClick={() => {
-                void resetAllDriversAvailable()
-                resetDb()
-                setForceNoDrivers(false)
-                void qc.invalidateQueries()
-                navigate('/welcome', { replace: true })
-                push(strings().common.demoResetOk, 'success')
-              }}
-            >
-              {t.common.resetDemo}
-            </Button>
+          <div className="mt-3 space-y-3">
+            <p className="text-xs font-medium text-amber-900/90">
+              {t.common.demoSpeedLabel}: <span className="font-extrabold">{simSpeed}x</span>
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={simSpeed === 1 ? 'secondary' : 'outline'}
+                type="button"
+                disabled={simSpeed === 1}
+                onClick={() => setSpeedSafe(1)}
+              >
+                1x
+              </Button>
+              <Button
+                size="sm"
+                variant={simSpeed === 2 ? 'secondary' : 'outline'}
+                type="button"
+                disabled={simSpeed === 2}
+                onClick={() => setSpeedSafe(2)}
+              >
+                2x
+              </Button>
+              <Button
+                size="sm"
+                variant={simSpeed === 4 ? 'secondary' : 'outline'}
+                type="button"
+                disabled={simSpeed === 4}
+                onClick={() => setSpeedSafe(4)}
+              >
+                4x
+              </Button>
+              <Button
+                size="sm"
+                variant={simSpeed === 10 ? 'secondary' : 'outline'}
+                type="button"
+                disabled={simSpeed === 10}
+                onClick={() => setSpeedSafe(10)}
+              >
+                10x
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" type="button" disabled={!rideId || forcePending} onClick={() => runDemoStatus('vozac_na_putu')}>
+                {t.common.forceDriverWay}
+              </Button>
+              <Button size="sm" variant="secondary" type="button" disabled={!rideId || forcePending} onClick={() => runDemoStatus('stigao')}>
+                {t.common.forceArrived}
+              </Button>
+              <Button size="sm" variant="secondary" type="button" disabled={!rideId || forcePending} onClick={() => runDemoStatus('u_toku')}>
+                {t.common.forceStartRide}
+              </Button>
+              <Button size="sm" variant="secondary" type="button" disabled={!rideId || forcePending} onClick={() => runDemoStatus('zavrsena')}>
+                {t.common.forceComplete}
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                onClick={() => {
+                  setForceNoDrivers(true)
+                  push(strings().order.noDrivers, 'info')
+                }}
+              >
+                {t.common.simNoDrivers}
+              </Button>
+              <Button
+                size="sm"
+                variant="danger"
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    cancelActiveAnimation()
+                    setShowArrivalPopup(false)
+                    setSimSpeed(1)
+                    if (rideId && driverOriginRef.current) {
+                      const newStart = ride ? generateDriverStartNearPickup(ride.pickup) : driverOriginRef.current
+                      driverOriginRef.current = newStart
+                      setDriverPosSim(newStart)
+                      setDriverStartDistanceKm(ride ? haversineKm(newStart, ride.pickup) : null)
+                      await updateDriverSimPosition(
+                        rideId,
+                        newStart.lat,
+                        newStart.lng
+                      )
+                      await setRideStatusSafe('dodijeljena')
+                    } else {
+                      await resetAllDriversAvailable()
+                      resetDb()
+                      await qc.invalidateQueries()
+                    }
+                    setForceNoDrivers(false)
+                    push(strings().common.demoResetOk, 'success')
+                  })()
+                }}
+              >
+                {t.common.resetDemo}
+              </Button>
+            </div>
           </div>
         ) : null}
       </motion.div>

@@ -102,6 +102,9 @@ export function RateRidePage() {
           <Button className="w-full" size="lg" disabled={mut.isPending} onClick={() => mut.mutate()}>
             {mut.isPending ? t.common.loading : t.rating.submit}
           </Button>
+          <Button variant="secondary" className="w-full" size="lg" onClick={() => navigate('/app/history', { replace: true })}>
+            {t.rating.skip}
+          </Button>
         </CardContent>
       </Card>
     </motion.div>
