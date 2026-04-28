@@ -64,6 +64,7 @@ export function OrderPage() {
   const addressGuideRef = useRef<HTMLDivElement>(null)
   const scheduleGuideRef = useRef<HTMLDivElement>(null)
   const mapShellGuideRef = useRef<HTMLDivElement>(null)
+  const mapInteractiveRef = useRef<HTMLDivElement>(null)
   const estimateGuideRef = useRef<HTMLDivElement>(null)
   const isMobileFlow = useIsMobileOrderFlow()
 
@@ -248,6 +249,11 @@ export function OrderPage() {
       (mapPickTarget === 'destination' && mobileDestMethod === 'map'))
   const routeMapPickTarget = !isMobileFlow ? mapPickTarget : mobileMapPicking ? mapPickTarget : null
   const mapEngaged = !!mapPickTarget || mapOverlayDismissed
+
+  useEffect(() => {
+    if (!mobileMapPicking) return
+    mapInteractiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
+  }, [mobileMapPicking])
 
   useEffect(() => {
     if (!isMobileFlow) return
@@ -616,11 +622,16 @@ export function OrderPage() {
 
           <div className="space-y-3">
             <div
-              ref={mapShellGuideRef}
+              ref={(node) => {
+                mapInteractiveRef.current = node
+                mapShellGuideRef.current = node
+              }}
               className={cn(
                 'group/map-shell scroll-mt-24 relative overflow-hidden rounded-2xl border border-black/[0.12] bg-slate-100',
                 'max-lg:-mx-4 max-lg:rounded-none max-lg:border-x-0 max-lg:border-y',
                 'transition-all duration-200 ease-out',
+                mobileMapPicking &&
+                  'max-lg:ring-2 max-lg:ring-inset max-lg:ring-[rgba(255,200,0,0.55)] max-lg:shadow-[0_0_0_2px_rgba(255,200,0,0.18)]',
                 mapEngaged
                   ? 'shadow-[0_4px_16px_rgba(0,0,0,0.10)]'
                   : [
