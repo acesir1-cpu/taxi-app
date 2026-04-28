@@ -27,6 +27,7 @@ import { getHistoryPrivacyPrefs } from '../lib/historyPrivacy'
 import { haversineKm } from '../utils/distance'
 
 type MobileLocMethod = 'map' | 'address' | null
+const SEARCH_REQUEST_KEY = 'urbanflow_search_request_id'
 
 function useIsMobileOrderFlow() {
   const [mobile, setMobile] = useState(
@@ -168,6 +169,11 @@ export function OrderPage() {
       }
       await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
       push(s.notifications.rideCreated, 'success')
+      try {
+        sessionStorage.setItem(SEARCH_REQUEST_KEY, res.request.id)
+      } catch {
+        // ignore storage issues in private mode
+      }
       navigate('/app/searching', {
         state: { requestId: res.request.id, forceNoDriversDemo: demoNoDriverMode },
         replace: false,

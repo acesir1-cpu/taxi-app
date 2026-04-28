@@ -11,6 +11,32 @@ import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Loader2 } from 'lucide-react'
 
+const SEARCH_REQUEST_KEY = 'urbanflow_search_request_id'
+
+function getStoredSearchRequestId(): string | null {
+  try {
+    return sessionStorage.getItem(SEARCH_REQUEST_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setStoredSearchRequestId(id: string): void {
+  try {
+    sessionStorage.setItem(SEARCH_REQUEST_KEY, id)
+  } catch {
+    // ignore
+  }
+}
+
+function clearStoredSearchRequestId(): void {
+  try {
+    sessionStorage.removeItem(SEARCH_REQUEST_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export function SearchingPage() {
   const t = strings()
   const { me } = useOutletContext<AppOutletContext>()
@@ -18,7 +44,7 @@ export function SearchingPage() {
   const location = useLocation() as { state?: { requestId?: string; forceNoDriversDemo?: boolean } }
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
-  const requestId = location.state?.requestId
+  const requestId = location.state?.requestId ?? getStoredSearchRequestId()
   const forceNoDriversDemo = location.state?.forceNoDriversDemo === true
   const [checked, setChecked] = useState<string[]>([])
   const [failed, setFailed] = useState(false)
@@ -34,6 +60,7 @@ export function SearchingPage() {
       navigate('/app/order', { replace: true })
       return
     }
+    setStoredSearchRequestId(requestId)
     let alive = true
     ;(async () => {
       const res = forceNoDriversDemo
@@ -47,6 +74,7 @@ export function SearchingPage() {
       if (!alive) return
       if ('error' in res) {
         await cancelRideRequest(requestId, me.account.id)
+        clearStoredSearchRequestId()
         setFailed(true)
         setState('no_driver')
         setLoading(false)
@@ -57,6 +85,7 @@ export function SearchingPage() {
       setLoading(false)
       await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
       await qc.invalidateQueries({ queryKey: ['ride', res.ride.id] })
+      clearStoredSearchRequestId()
       navigate(`/app/ride/${res.ride.id}`, { replace: true })
     })()
     return () => {
