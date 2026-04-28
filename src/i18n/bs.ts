@@ -117,6 +117,8 @@ export const bs = {
     tapSelectDestination: 'Odaberi odredište',
     setCenterLocation: 'Postavi ovu lokaciju',
     useCurrentLocation: 'Koristi moju trenutnu lokaciju',
+    mapFullscreenTitle: 'Odaberi lokaciju',
+    mapMoveHint: 'Pomjerite mapu da odaberete lokaciju',
     locMethodHow: 'Kako želite postaviti lokaciju?',
     methodAddressShort: 'Adresa',
     methodMapShort: 'Karta',

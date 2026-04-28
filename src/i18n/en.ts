@@ -116,6 +116,8 @@ export const en = {
     tapSelectDestination: 'Choose destination',
     setCenterLocation: 'Set this location',
     useCurrentLocation: 'Use my current location',
+    mapFullscreenTitle: 'Choose location',
+    mapMoveHint: 'Move the map to select location',
     locMethodHow: 'How do you want to set this location?',
     methodAddressShort: 'Address',
     methodMapShort: 'Map',

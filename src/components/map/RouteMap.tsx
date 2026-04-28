@@ -23,6 +23,8 @@ interface RouteMapProps {
   setCenterLocationLabel?: string
   /** Controls whether the map should capture user gestures. */
   allowTouchInteraction?: boolean
+  /** Fullscreen canvas mode for mobile picking. */
+  fullscreen?: boolean
 }
 
 function MapClickHandler({
@@ -119,6 +121,7 @@ export default function RouteMap({
   interactionMode = 'mapClick',
   setCenterLocationLabel = '',
   allowTouchInteraction = true,
+  fullscreen = false,
 }: RouteMapProps) {
   const center: [number, number] = pickup
     ? [pickup.lat, pickup.lng]
@@ -137,6 +140,7 @@ export default function RouteMap({
     <div
       className={cn(
         'overflow-hidden rounded-2xl border border-black/[0.12] bg-slate-100',
+        fullscreen && 'rounded-none border-0',
         picking && 'ring-2 ring-inset ring-brand-yellow/90',
         className
       )}
@@ -145,7 +149,9 @@ export default function RouteMap({
         center={center}
         zoom={13}
         className={cn(
-          'h-[min(52vh,420px)] w-full min-h-[260px] touch-manipulation lg:h-[420px] lg:min-h-[420px]',
+          fullscreen
+            ? 'h-[100dvh] w-full min-h-[100dvh] touch-pan-x touch-pan-y'
+            : 'h-[min(52vh,420px)] w-full min-h-[260px] touch-manipulation lg:h-[420px] lg:min-h-[420px]',
           !allowTouchInteraction && 'touch-auto',
           clickPick && 'cursor-crosshair',
           centerPinPick && 'touch-pan-x touch-pan-y'

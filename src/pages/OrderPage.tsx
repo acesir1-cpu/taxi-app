@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Map as MapIcon, MapPin, Navigation, Search } from 'lucide-react'
+import { Map as MapIcon, MapPin, Navigation, Search, X } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
@@ -61,6 +61,7 @@ export function OrderPage() {
   const [geoLoading, setGeoLoading] = useState(false)
   const [mobilePickupMethod, setMobilePickupMethod] = useState<MobileLocMethod>(null)
   const [mobileDestMethod, setMobileDestMethod] = useState<MobileLocMethod>(null)
+  const [showMobileMapHint, setShowMobileMapHint] = useState(false)
   const addressGuideRef = useRef<HTMLDivElement>(null)
   const scheduleGuideRef = useRef<HTMLDivElement>(null)
   const mapShellGuideRef = useRef<HTMLDivElement>(null)
@@ -254,6 +255,30 @@ export function OrderPage() {
     if (!mobileMapPicking) return
     mapInteractiveRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
   }, [mobileMapPicking])
+
+  useEffect(() => {
+    if (!mobileMapPicking) {
+      setShowMobileMapHint(false)
+      return
+    }
+    setShowMobileMapHint(true)
+    const timer = window.setTimeout(() => setShowMobileMapHint(false), 2000)
+    return () => clearTimeout(timer)
+  }, [mobileMapPicking])
+
+  useEffect(() => {
+    if (!mobileMapPicking) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [mobileMapPicking])
+
+  function closeMobileMapPicker() {
+    if (mapPickTarget === 'pickup') setMobilePickupMethod(null)
+    if (mapPickTarget === 'destination') setMobileDestMethod(null)
+  }
 
   useEffect(() => {
     if (!isMobileFlow) return
@@ -729,6 +754,71 @@ export function OrderPage() {
           {activeQ.data ? <p className="mt-2 text-center text-xs text-amber-800">{t.order.activeExists}</p> : null}
         </div>
       </div>
+
+      {mobileMapPicking ? (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.985 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.985 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="fixed inset-0 z-[120] bg-white"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t.order.mapFullscreenTitle}
+        >
+          <div className="absolute inset-x-0 top-0 z-[950] border-b border-black/[0.08] bg-white/95 px-4 py-3 backdrop-blur-md">
+            <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
+              <h3 className="text-sm font-extrabold tracking-tight text-brand-navy">{t.order.mapFullscreenTitle}</h3>
+              <button
+                type="button"
+                onClick={closeMobileMapPicker}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.1] bg-white text-slate-700 active:scale-[0.98]"
+                aria-label={t.common.close}
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+          </div>
+
+          {showMobileMapHint ? (
+            <div className="pointer-events-none absolute inset-x-0 top-16 z-[960] flex justify-center px-4">
+              <p className="rounded-full border border-white/50 bg-white/90 px-4 py-2 text-center text-xs font-semibold text-slate-700 shadow-md backdrop-blur-md">
+                {t.order.mapMoveHint}
+              </p>
+            </div>
+          ) : null}
+
+          <RouteMap
+            pickup={pickup}
+            destination={destination}
+            routePoints={route?.routePoints ?? []}
+            className="h-full"
+            mapPickTarget={routeMapPickTarget}
+            onMapPick={handleMapPick}
+            onUserMapInteraction={() => {
+              setMapOverlayDismissed(true)
+              setShowMobileMapHint(false)
+            }}
+            interactionMode="centerPin"
+            setCenterLocationLabel={t.order.setCenterLocation}
+            allowTouchInteraction
+            fullscreen
+          />
+
+          {mapPickTarget === 'pickup' ? (
+            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[950] flex justify-center px-4">
+              <button
+                type="button"
+                disabled={geoLoading}
+                onClick={useCurrentLocationForPickup}
+                className="pointer-events-auto inline-flex items-center justify-center rounded-full border border-black/[0.1] bg-white/95 px-4 py-2 text-xs font-bold text-brand-navy shadow-lg active:scale-[0.98] disabled:opacity-60"
+              >
+                {geoLoading ? t.common.loading : t.order.useCurrentLocation}
+              </button>
+            </div>
+          ) : null}
+        </motion.div>
+      ) : null}
 
       <section className="mt-12 space-y-4 sm:mt-14">
         <div className="flex items-end justify-between gap-4">
