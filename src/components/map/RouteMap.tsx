@@ -21,6 +21,8 @@ interface RouteMapProps {
   interactionMode?: RouteMapInteractionMode
   /** Tekst na dugmetu ispod mape u `centerPin` načinu. */
   setCenterLocationLabel?: string
+  /** Controls whether the map should capture user gestures. */
+  allowTouchInteraction?: boolean
 }
 
 function MapClickHandler({
@@ -116,6 +118,7 @@ export default function RouteMap({
   onUserMapInteraction,
   interactionMode = 'mapClick',
   setCenterLocationLabel = '',
+  allowTouchInteraction = true,
 }: RouteMapProps) {
   const center: [number, number] = pickup
     ? [pickup.lat, pickup.lng]
@@ -143,10 +146,16 @@ export default function RouteMap({
         zoom={13}
         className={cn(
           'h-[min(52vh,420px)] w-full min-h-[260px] touch-manipulation lg:h-[420px] lg:min-h-[420px]',
+          !allowTouchInteraction && 'touch-auto',
           clickPick && 'cursor-crosshair',
           centerPinPick && 'touch-pan-x touch-pan-y'
         )}
-        scrollWheelZoom
+        scrollWheelZoom={allowTouchInteraction}
+        dragging={allowTouchInteraction}
+        touchZoom={allowTouchInteraction}
+        doubleClickZoom={allowTouchInteraction}
+        boxZoom={allowTouchInteraction}
+        keyboard={allowTouchInteraction}
       >
         <MapClickHandler
           active={clickPick}

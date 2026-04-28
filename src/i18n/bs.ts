@@ -133,7 +133,7 @@ export const bs = {
     mapGuideStep2Mobile: 'Ispod procjene: odmah ili zakažite vožnju i datum.',
     mapGuideStep3: 'Zatim postavite odredište — mapa ili adresa.',
     mapGuideStep3Mobile: 'Pregledajte procjenu, zatim potvrdite vožnju.',
-    mapGuideGotIt: 'Shvaćam',
+    mapGuideGotIt: 'Razmijem',
     mapGuideSkip: 'Preskoči',
     notAvailable: 'Nije dostupno',
   },

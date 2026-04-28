@@ -647,6 +647,7 @@ export function OrderPage() {
                   onUserMapInteraction={() => setMapOverlayDismissed(true)}
                   interactionMode={isMobileFlow ? 'centerPin' : 'mapClick'}
                   setCenterLocationLabel={t.order.setCenterLocation}
+                  allowTouchInteraction={!isMobileFlow || mobileMapPicking}
                 />
               </Suspense>
               <div
