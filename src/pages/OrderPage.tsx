@@ -23,6 +23,8 @@ import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { MapLocationOnboarding } from '../components/onboarding/MapLocationOnboarding'
 import { hasSeenMapGuide, setMapGuideSeen } from '../lib/mapGuideStorage'
+import { getHistoryPrivacyPrefs } from '../lib/historyPrivacy'
+import { haversineKm } from '../utils/distance'
 
 type MobileLocMethod = 'map' | 'address' | null
 
@@ -52,6 +54,7 @@ export function OrderPage() {
   const [destination, setDestination] = useState<Location | null>(null)
   const [orderType, setOrderType] = useState<OrderType>('odmah')
   const [scheduledLocal, setScheduledLocal] = useState('')
+  const [scheduleMin, setScheduleMin] = useState(() => toLocalDateTimeValue(new Date()))
   const [mapPickTarget, setMapPickTarget] = useState<'pickup' | 'destination' | null>(null)
   const [mapOverlayDismissed, setMapOverlayDismissed] = useState(false)
   const [mapGuideActive, setMapGuideActive] = useState(
@@ -68,6 +71,16 @@ export function OrderPage() {
   const mapInteractiveRef = useRef<HTMLDivElement>(null)
   const estimateGuideRef = useRef<HTMLDivElement>(null)
   const isMobileFlow = useIsMobileOrderFlow()
+  const [sameLocationError, setSameLocationError] = useState(false)
+  const [demoNoDriverMode, setDemoNoDriverMode] = useState(false)
+  const historyPrefs = getHistoryPrivacyPrefs(me.account.id)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setScheduleMin(toLocalDateTimeValue(new Date()))
+    }, 30_000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => {
     if (!hasSeenMapGuide()) {
@@ -155,7 +168,10 @@ export function OrderPage() {
       }
       await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
       push(s.notifications.rideCreated, 'success')
-      navigate('/app/searching', { state: { requestId: res.request.id }, replace: false })
+      navigate('/app/searching', {
+        state: { requestId: res.request.id, forceNoDriversDemo: demoNoDriverMode },
+        replace: false,
+      })
     },
     onError: (e) => {
       const s = strings()
@@ -168,6 +184,11 @@ export function OrderPage() {
 
   const route = routeQuery.data && !('error' in routeQuery.data) ? routeQuery.data : null
   const routeErr = routeQuery.data && 'error' in routeQuery.data ? routeQuery.data.error : null
+  const sameLocationByDistance = !!pickup && !!destination && haversineKm(pickup, destination) < 0.05
+
+  useEffect(() => {
+    setSameLocationError(sameLocationByDistance)
+  }, [sameLocationByDistance])
 
   function reset() {
     setPickup(null)
@@ -178,17 +199,19 @@ export function OrderPage() {
     setMobilePickupMethod(null)
     setMobileDestMethod(null)
     setMapOverlayDismissed(false)
+    setSameLocationError(false)
+    setDemoNoDriverMode(false)
     void qc.invalidateQueries({ queryKey: ['routePreview'] })
   }
 
   const handleMapPick = useCallback(
-    (lat: number, lng: number) => {
+    async (lat: number, lng: number) => {
       setMapOverlayDismissed(true)
       if (!isInServiceZone(lat, lng)) {
         push(t.order.outsideZone, 'error')
         return
       }
-      const loc = createLocationFromMapClick(lat, lng)
+      const loc = await createLocationFromMapClick(lat, lng)
       if (mapPickTarget === 'pickup') {
         setPickup(loc)
         setMobilePickupMethod(null)
@@ -209,13 +232,16 @@ export function OrderPage() {
       return
     }
     setMapOverlayDismissed(true)
-    setPickup(createLocationFromMapClick(lat, lng))
-    setMobilePickupMethod(null)
-    if (isMobileFlow) setMapPickTarget('destination')
-    else setMapPickTarget(null)
+    void (async () => {
+      const loc = await createLocationFromMapClick(lat, lng)
+      setPickup(loc)
+      setMobilePickupMethod(null)
+      if (isMobileFlow) setMapPickTarget('destination')
+      else setMapPickTarget(null)
+    })()
   }
 
-  function useCurrentLocationForPickup() {
+  function requestCurrentLocationForPickup() {
     if (!navigator.geolocation) {
       push(t.order.geoUnsupported, 'error')
       return
@@ -308,12 +334,15 @@ export function OrderPage() {
   const canPickDestinationMobile = pickup != null
 
   const confirmDisabled = !route || !!activeQ.data || mut.isPending
+    || sameLocationByDistance
   const confirmLabel = mut.isPending
     ? t.common.loading
     : activeQ.data
       ? t.order.activeExists
       : !route
         ? t.order.confirmDisabledHint
+        : sameLocationByDistance
+          ? t.order.sameLoc
         : t.order.confirm
 
   return (
@@ -342,6 +371,11 @@ export function OrderPage() {
                     placeholder={t.order.addressPlaceholder}
                     emptyHint={t.order.geocodeEmpty}
                   />
+                  {sameLocationError ? (
+                    <p className="text-xs font-medium text-brand-danger">
+                      Polaziste i odrediste ne mogu biti ista lokacija.
+                    </p>
+                  ) : null}
                 </div>
                 <div ref={scheduleGuideRef} className="space-y-4">
                   <div className="flex rounded-2xl border border-black/[0.12] bg-slate-100/90 p-1">
@@ -379,11 +413,29 @@ export function OrderPage() {
                         id="sched"
                         type="datetime-local"
                         value={scheduledLocal}
-                        onChange={(e) => setScheduledLocal(e.target.value)}
+                        min={scheduleMin}
+                        onChange={(e) => {
+                          const next = e.target.value
+                          setScheduledLocal(next)
+                          if (next && new Date(next) < new Date()) {
+                            push(t.order.pastSchedule, 'error')
+                          }
+                        }}
                       />
                     </div>
                   ) : null}
                   <div className="pt-0.5">
+                    <label className="mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 accent-brand-navy"
+                        checked={demoNoDriverMode}
+                        onChange={(e) => setDemoNoDriverMode(e.target.checked)}
+                      />
+                      <span>
+                        {t.order.demoNoDriverToggle}
+                      </span>
+                    </label>
                     <Button
                       type="button"
                       variant="ghost"
@@ -499,7 +551,7 @@ export function OrderPage() {
                         <button
                           type="button"
                           disabled={geoLoading}
-                          onClick={() => useCurrentLocationForPickup()}
+                          onClick={() => requestCurrentLocationForPickup()}
                           className="flex min-h-[72px] flex-col items-center justify-center gap-1 rounded-xl border-2 border-black/[0.08] bg-white px-1 py-2 text-brand-navy shadow-sm active:scale-[0.98] disabled:opacity-50"
                         >
                           <Navigation className="h-5 w-5 shrink-0" aria-hidden />
@@ -712,6 +764,11 @@ export function OrderPage() {
             {routeErr === 'outside' ? (
               <p className="text-center text-xs font-medium text-brand-danger">{t.order.outsideZone}</p>
             ) : null}
+            {sameLocationError ? (
+              <p className="text-center text-xs font-medium text-brand-danger">
+                Polaziste i odrediste ne mogu biti ista lokacija.
+              </p>
+            ) : null}
           </div>
         </div>
 
@@ -752,6 +809,11 @@ export function OrderPage() {
         <div className="mx-auto w-full max-w-6xl">
           <ConfirmBlock disabled={confirmDisabled} label={confirmLabel} onClick={() => mut.mutate()} />
           {activeQ.data ? <p className="mt-2 text-center text-xs text-amber-800">{t.order.activeExists}</p> : null}
+          {sameLocationError ? (
+            <p className="mt-2 text-center text-xs text-brand-danger">
+              Polaziste i odrediste ne mogu biti ista lokacija.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -810,7 +872,7 @@ export function OrderPage() {
               <button
                 type="button"
                 disabled={geoLoading}
-                onClick={useCurrentLocationForPickup}
+                onClick={requestCurrentLocationForPickup}
                 className="pointer-events-auto inline-flex items-center justify-center rounded-full border border-black/[0.1] bg-white/95 px-4 py-2 text-xs font-bold text-brand-navy shadow-lg active:scale-[0.98] disabled:opacity-60"
               >
                 {geoLoading ? t.common.loading : t.order.useCurrentLocation}
@@ -820,41 +882,51 @@ export function OrderPage() {
         </motion.div>
       ) : null}
 
-      <section className="mt-12 space-y-4 sm:mt-14">
-        <div className="flex items-end justify-between gap-4">
-          <h2 className="text-xl font-semibold tracking-tight text-brand-navy">{t.order.recentRidesTitle}</h2>
-          <Link
-            to="/app/history"
-            className="text-sm font-semibold text-brand-teal transition-colors duration-150 hover:text-brand-navy hover:underline"
-          >
-            {t.nav.history}
-          </Link>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {historyQ.data?.slice(0, 3).map((r) => (
-            <Card
-              key={r.id}
-              className="transition-[transform,box-shadow] duration-150 ease-out hover:-translate-y-[2px] hover:shadow-card-hover"
+      {!historyPrefs.saveHistory ? null : (
+        <section className="mt-12 space-y-4 sm:mt-14">
+          <div className="flex items-end justify-between gap-4">
+            <h2 className="text-xl font-semibold tracking-tight text-brand-navy">{t.order.recentRidesTitle}</h2>
+            <Link
+              to="/app/history"
+              className="text-sm font-semibold text-brand-teal transition-colors duration-150 hover:text-brand-navy hover:underline"
             >
-              <CardContent className="flex flex-col gap-3 py-6 text-sm">
-                <p className="order-3 text-xs font-medium text-slate-500">{formatBsDate(r.createdAt)}</p>
-                <p className="order-1 text-[15px] font-extrabold leading-snug text-brand-navy">
-                  {r.pickup.label} → {r.destination.label}
-                </p>
-                <p className="order-2 text-sm font-bold tabular-nums tracking-tight text-brand-navy whitespace-nowrap">
-                  {(r.finalPrice ?? r.estimatedPrice).toFixed(2)} {t.order.bam}
-                </p>
-                <Link
-                  to={`/app/history/${r.id}`}
-                  className="order-4 w-fit text-sm font-semibold text-brand-teal no-underline decoration-brand-teal underline-offset-4 transition-colors duration-150 hover:text-brand-navy hover:underline hover:decoration-brand-navy"
-                >
-                  {t.history.details}
-                </Link>
+              {t.nav.history}
+            </Link>
+          </div>
+          {historyQ.data && historyQ.data.length === 0 ? (
+            <Card>
+              <CardContent className="py-6 text-sm font-medium text-slate-600">
+                {t.history.empty}
               </CardContent>
             </Card>
-          ))}
-        </div>
-      </section>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {historyQ.data?.slice(0, 3).map((r) => (
+                <Card
+                  key={r.id}
+                  className="transition-[transform,box-shadow] duration-150 ease-out hover:-translate-y-[2px] hover:shadow-card-hover"
+                >
+                  <CardContent className="flex flex-col gap-3 py-6 text-sm">
+                    <p className="order-3 text-xs font-medium text-slate-500">{formatBsDate(r.createdAt)}</p>
+                    <p className="order-1 text-[15px] font-extrabold leading-snug text-brand-navy">
+                      {r.pickup.label} → {r.destination.label}
+                    </p>
+                    <p className="order-2 text-sm font-bold tabular-nums tracking-tight text-brand-navy whitespace-nowrap">
+                      {(r.finalPrice ?? r.estimatedPrice).toFixed(2)} {t.order.bam}
+                    </p>
+                    <Link
+                      to={`/app/history/${r.id}`}
+                      className="order-4 w-fit text-sm font-semibold text-brand-teal no-underline decoration-brand-teal underline-offset-4 transition-colors duration-150 hover:text-brand-navy hover:underline hover:decoration-brand-navy"
+                    >
+                      {t.history.details}
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <MapLocationOnboarding
         open={mapGuideActive}
@@ -926,4 +998,14 @@ function ConfirmBlock({
       {label}
     </Button>
   )
+}
+
+function toLocalDateTimeValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const y = date.getFullYear()
+  const m = pad(date.getMonth() + 1)
+  const d = pad(date.getDate())
+  const h = pad(date.getHours())
+  const min = pad(date.getMinutes())
+  return `${y}-${m}-${d}T${h}:${min}`
 }

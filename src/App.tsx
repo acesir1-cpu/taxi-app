@@ -18,6 +18,7 @@ import { HistoryDetailPage } from './pages/HistoryDetailPage'
 import { ProblemPage } from './pages/ProblemPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { ActiveRideRedirectPage } from './pages/ActiveRideRedirectPage'
+import { NoDriverPage } from './pages/NoDriverPage'
 
 function RootRedirect() {
   const { data, isLoading } = useMe()
@@ -75,6 +76,7 @@ export default function App() {
           <Route index element={<Navigate to="/app/order" replace />} />
           <Route path="order" element={<OrderPage />} />
           <Route path="searching" element={<SearchingPage />} />
+          <Route path="no-driver" element={<NoDriverPage />} />
           <Route path="ride/:id" element={<RidePage />} />
           <Route path="rate/:rideId" element={<RateRidePage />} />
           <Route path="history" element={<HistoryPage />} />

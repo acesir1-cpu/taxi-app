@@ -52,3 +52,10 @@ export async function markAllRead(accountId: string): Promise<void> {
   }
   persist()
 }
+
+export async function deleteAllNotifications(accountId: string): Promise<void> {
+  await delay(150)
+  const db = getDb()
+  db.notifications = db.notifications.filter((n) => n.accountId !== accountId)
+  persist()
+}

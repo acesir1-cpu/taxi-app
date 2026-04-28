@@ -17,7 +17,6 @@ import {
   setRideStatus,
   updateDriverSimPosition,
 } from '../services/rideApi'
-import { setForceNoDrivers } from '../services/demoFlags'
 import { resetDb } from '../services/mockDb'
 import { useToastStore } from '../store/notificationStore'
 import { MapChunkFallback } from '../components/map/MapChunkFallback'
@@ -173,6 +172,7 @@ export function RidePage() {
     }
     await qc.invalidateQueries({ queryKey: ['ride', rideId] })
     await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
+    await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
     return true
   }
 
@@ -341,6 +341,7 @@ export function RidePage() {
       setCancelOpen(false)
       push(strings().notifications.rideCancelled, 'success')
       await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
+      await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
       navigate('/app/history', { replace: true })
     },
   })
@@ -527,17 +528,6 @@ export function RidePage() {
             <div className="flex flex-wrap gap-2">
               <Button
                 size="sm"
-                variant="outline"
-                type="button"
-                onClick={() => {
-                  setForceNoDrivers(true)
-                  push(strings().order.noDrivers, 'info')
-                }}
-              >
-                {t.common.simNoDrivers}
-              </Button>
-              <Button
-                size="sm"
                 variant="danger"
                 type="button"
                 onClick={() => {
@@ -561,7 +551,6 @@ export function RidePage() {
                       resetDb()
                       await qc.invalidateQueries()
                     }
-                    setForceNoDrivers(false)
                     push(strings().common.demoResetOk, 'success')
                   })()
                 }}
@@ -574,7 +563,7 @@ export function RidePage() {
       </motion.div>
 
       {cancelOpen ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center" role="presentation" onClick={() => setCancelOpen(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation" onClick={() => setCancelOpen(false)}>
           <div
             role="dialog"
             aria-modal="true"

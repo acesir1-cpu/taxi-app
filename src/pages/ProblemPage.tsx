@@ -59,6 +59,10 @@ export function ProblemPage() {
     queryFn: () => getRideById(rideId!),
     enabled: !!rideId,
   })
+  const ride = rideQ.data
+  const isActiveRide =
+    ride != null && ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(ride.status)
+  const backTarget = rideId ? (isActiveRide ? `/app/ride/${rideId}` : `/app/history/${rideId}`) : '/app/history'
 
   const form = useForm<Form>({
     resolver: zodResolver(schema),
@@ -74,11 +78,11 @@ export function ProblemPage() {
       }
       await qc.invalidateQueries({ queryKey: ['complaints', me.account.id] })
       push(strings().problem.sent, 'success')
-      navigate(`/app/history/${rideId}`, { replace: true })
+      navigate(backTarget, { replace: true })
     },
   })
 
-  if (!rideQ.data) {
+  if (!ride) {
     return <p className="text-sm text-slate-600">{t.history.rideNotFound}</p>
   }
 
@@ -114,7 +118,7 @@ export function ProblemPage() {
               {t.problem.submit}
             </Button>
             <Button variant="secondary" type="button" asChild>
-              <Link to={`/app/history/${rideId}`}>{t.common.back}</Link>
+              <Link to={backTarget}>{t.common.back}</Link>
             </Button>
           </div>
         </form>

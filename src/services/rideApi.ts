@@ -1,11 +1,11 @@
 import type { Driver, Location, OrderType, Rating, Ride, RideRequest, RideStatus, Vehicle } from '../types/domain'
 import { haversineKm } from '../utils/distance'
-import { getForceNoDrivers } from './demoFlags'
 import { delay } from './delay'
 import { calculateRoute } from './locationApi'
 import { strings } from '../i18n/strings'
 import { addNotification } from './notificationApi'
 import { getDb, persist } from './mockDb'
+import { getHistoryPrivacyPrefs } from '../lib/historyPrivacy'
 
 function uid(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -15,6 +15,21 @@ const ACTIVE_RIDE_STATUSES: RideStatus[] = ['dodijeljena', 'vozac_na_putu', 'sti
 
 export function isRideActive(status: RideStatus): boolean {
   return ACTIVE_RIDE_STATUSES.includes(status)
+}
+
+function normalizeDriverAvailabilityFromActiveRides(): void {
+  const db = getDb()
+  const activeDriverIds = new Set(
+    db.rides.filter((ride) => isRideActive(ride.status)).map((ride) => ride.driverId)
+  )
+  let changed = false
+  for (const driver of db.drivers) {
+    if (driver.availabilityStatus === 'zauzet' && !activeDriverIds.has(driver.id)) {
+      driver.availabilityStatus = 'dostupan'
+      changed = true
+    }
+  }
+  if (changed) persist()
 }
 
 export async function getActiveRide(passengerProfileId: string): Promise<Ride | null> {
@@ -36,9 +51,80 @@ export async function getRideById(rideId: string): Promise<Ride | null> {
 export async function getRideHistory(passengerProfileId: string): Promise<Ride[]> {
   await delay()
   const db = getDb()
+  const profile = db.profiles.find((p) => p.id === passengerProfileId)
+  if (profile && !getHistoryPrivacyPrefs(profile.accountId).saveHistory) {
+    return []
+  }
+
+  let normalized = false
+  for (const ride of db.rides) {
+    if (ride.status === 'zavrsena' && (!ride.startedAt || !ride.finishedAt)) {
+      ride.status = 'neuspjesna'
+      ride.cancellationReason = ride.cancellationReason ?? 'Voznja nije odrzana'
+      normalized = true
+    }
+  }
+  if (normalized) persist()
+
   return db.rides
     .filter((r) => r.passengerId === passengerProfileId)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+}
+
+export async function purgePassengerHistory(
+  accountId: string,
+  passengerProfileId: string
+): Promise<{ ok: true }> {
+  await delay(180)
+  const db = getDb()
+  const rideIds = new Set(
+    db.rides.filter((r) => r.passengerId === passengerProfileId).map((r) => r.id)
+  )
+  db.rides = db.rides.filter((r) => r.passengerId !== passengerProfileId)
+  db.rideRequests = db.rideRequests.filter((r) => r.passengerId !== passengerProfileId)
+  db.ratings = db.ratings.filter((r) => !rideIds.has(r.rideId))
+  db.complaints = db.complaints.filter((c) => !rideIds.has(c.rideId))
+  db.notifications = db.notifications.filter(
+    (n) => !(n.accountId === accountId && n.type === 'ride')
+  )
+  db.activityLogs.unshift({
+    id: uid('log'),
+    accountId,
+    type: 'system',
+    description: 'Historija voznji trajno obrisana iz aplikacije',
+    createdAt: new Date().toISOString(),
+  })
+  persist()
+  const n0 = strings().notifications
+  await addNotification(accountId, n0.inboxRide, n0.historyCleared, 'ride')
+  return { ok: true }
+}
+
+export async function deleteRideFromHistory(
+  rideId: string,
+  accountId: string,
+  passengerProfileId: string
+): Promise<{ ok: true } | { error: 'not_found' | 'forbidden' }> {
+  await delay(140)
+  const db = getDb()
+  const ride = db.rides.find((r) => r.id === rideId)
+  if (!ride) return { error: 'not_found' }
+  if (ride.passengerId !== passengerProfileId) return { error: 'forbidden' }
+  db.rides = db.rides.filter((r) => r.id !== rideId)
+  db.rideRequests = db.rideRequests.filter((r) => r.id !== ride.requestId)
+  db.ratings = db.ratings.filter((r) => r.rideId !== rideId)
+  db.complaints = db.complaints.filter((c) => c.rideId !== rideId)
+  db.activityLogs.unshift({
+    id: uid('log'),
+    accountId,
+    type: 'ride',
+    description: `Voznja obrisana iz historije ${rideId}`,
+    createdAt: new Date().toISOString(),
+  })
+  persist()
+  const n1 = strings().notifications
+  await addNotification(accountId, n1.inboxRide, n1.historyRideDeleted, 'ride')
+  return { ok: true }
 }
 
 export interface CreateRideRequestInput {
@@ -58,7 +144,10 @@ export async function createRideRequest(
   const active = await getActiveRide(input.passengerProfileId)
   if (active) return { error: 'active_exists' }
 
-  if (input.pickup.id === input.destination.id && input.pickup.lat === input.destination.lat) {
+  if (
+    (input.pickup.id === input.destination.id && input.pickup.lat === input.destination.lat) ||
+    haversineKm(input.pickup, input.destination) < 0.05
+  ) {
     return { error: 'same_location' }
   }
   if (input.orderType === 'zakazano' && input.scheduledAt) {
@@ -103,11 +192,14 @@ export async function createRideRequest(
 
 export async function assignDriver(
   requestId: string,
-  accountId: string
+  accountId: string,
+  options?: { forceNoDrivers?: boolean }
 ): Promise<{ ok: true; ride: Ride } | { error: 'no_drivers' | 'not_found' }> {
   await delay(2000 + Math.floor(Math.random() * 2000))
+  normalizeDriverAvailabilityFromActiveRides()
   const db = getDb()
-  if (getForceNoDrivers()) {
+  const forceNoDrivers = options?.forceNoDrivers === true
+  if (forceNoDrivers) {
     const req = db.rideRequests.find((r) => r.id === requestId)
     if (req) {
       req.status = 'neuspjesan'
@@ -188,6 +280,26 @@ export async function assignDriver(
   return { ok: true, ride }
 }
 
+export async function cancelRideRequest(
+  requestId: string,
+  accountId: string
+): Promise<{ ok: true } | { error: 'not_found' }> {
+  await delay(120)
+  const db = getDb()
+  const request = db.rideRequests.find((r) => r.id === requestId)
+  if (!request) return { error: 'not_found' }
+  request.status = 'otkazan'
+  db.activityLogs.unshift({
+    id: uid('log'),
+    accountId,
+    type: 'ride',
+    description: `Zahtjev otkazan ${requestId}`,
+    createdAt: new Date().toISOString(),
+  })
+  persist()
+  return { ok: true }
+}
+
 export async function setRideStatus(
   rideId: string,
   status: RideStatus,
@@ -232,6 +344,11 @@ export async function setRideStatus(
     if (req) req.status = 'otkazan'
     const n7 = strings().notifications
     await addNotification(accountId, n7.inboxRide, n7.rideCancelled, 'ride')
+  }
+  if ((status === 'zavrsena' || status === 'otkazana') && !getHistoryPrivacyPrefs(accountId).saveHistory) {
+    db.rides = db.rides.filter((r) => r.id !== ride.id)
+    db.ratings = db.ratings.filter((r) => r.rideId !== ride.id)
+    db.complaints = db.complaints.filter((c) => c.rideId !== ride.id)
   }
   persist()
   return { ok: true, ride }

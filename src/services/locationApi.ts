@@ -6,6 +6,7 @@ import { estimateDurationMin, interpolateRoute } from '../utils/route'
 import { delay } from './delay'
 
 const PHOTON_URL = 'https://photon.komoot.io/api/'
+const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse'
 const DEDupe_KM = 0.03
 const MIN_CHARS_GEOCODE = 3
 
@@ -16,6 +17,22 @@ type PhotonFeature = {
 }
 
 type PhotonResponse = { features?: PhotonFeature[] }
+type NominatimReverseResponse = {
+  display_name?: string
+  address?: {
+    road?: string
+    pedestrian?: string
+    footway?: string
+    path?: string
+    house_number?: string
+    city?: string
+    town?: string
+    village?: string
+    suburb?: string
+    postcode?: string
+    country?: string
+  }
+}
 
 function photonFeatureToLocation(f: PhotonFeature): Location | null {
   if (f.geometry?.type !== 'Point' || !f.geometry.coordinates || f.geometry.coordinates.length < 2) {
@@ -61,6 +78,61 @@ async function photonSearchAddresses(trimmed: string, signal?: AbortSignal): Pro
   return out
 }
 
+async function photonReverseLookup(lat: number, lng: number, signal?: AbortSignal): Promise<Location | null> {
+  const url = `${PHOTON_URL}?${new URLSearchParams({
+    lat: String(lat),
+    lon: String(lng),
+    limit: '1',
+    lang: 'en',
+  })}`
+  const res = await fetch(url, { signal })
+  if (!res.ok) throw new Error('photon-reverse')
+  const data = (await res.json()) as PhotonResponse
+  const feature = data.features?.[0]
+  if (!feature) return null
+  return photonFeatureToLocation(feature)
+}
+
+async function nominatimReverseLookup(
+  lat: number,
+  lng: number,
+  signal?: AbortSignal
+): Promise<Location | null> {
+  const url = `${NOMINATIM_REVERSE_URL}?${new URLSearchParams({
+    format: 'jsonv2',
+    lat: String(lat),
+    lon: String(lng),
+    addressdetails: '1',
+    zoom: '18',
+  })}`
+  const res = await fetch(url, {
+    signal,
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+  if (!res.ok) throw new Error('nominatim-reverse')
+  const data = (await res.json()) as NominatimReverseResponse
+  const a = data.address
+  if (!a) return null
+  const street = a.road || a.pedestrian || a.footway || a.path || ''
+  const houseNumber = a.house_number || ''
+  const streetLine = [street, houseNumber].filter(Boolean).join(' ')
+  const city = a.city || a.town || a.village || a.suburb || 'Sarajevo'
+  const postcode = a.postcode || ''
+  const country = a.country || 'Bosnia and Herzegovina'
+  const label = streetLine || data.display_name?.split(',')[0]?.trim() || `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+  const address = [streetLine || label, postcode, city, country].filter(Boolean).join(', ')
+  return {
+    id: `nominatim-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+    label,
+    address,
+    lat,
+    lng,
+    zoneId: ZONE_SARAJEVO,
+  }
+}
+
 function mergeDeduped(primary: Location[], secondary: Location[], max = 12): Location[] {
   const out: Location[] = [...primary]
   for (const s of secondary) {
@@ -85,7 +157,7 @@ export async function searchLocations(query: string, signal?: AbortSignal): Prom
     await delay(120)
     return local.slice(0, 12)
   }
-  let remote: Location[] = []
+  let remote: Location[]
   try {
     remote = await photonSearchAddresses(trimmed, signal)
   } catch {
@@ -105,7 +177,44 @@ export function isInServiceZone(lat: number, lng: number): boolean {
 }
 
 /** Lokacija iz korisničkog klika na kartu (MVP zona Sarajevo). */
-export function createLocationFromMapClick(lat: number, lng: number): Location {
+export async function createLocationFromMapClick(lat: number, lng: number): Promise<Location> {
+  try {
+    const nominatim = await nominatimReverseLookup(lat, lng)
+    if (nominatim) {
+      return {
+        ...nominatim,
+        id: `map-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+      }
+    }
+  } catch {
+    // continue to photon fallback
+  }
+  try {
+    const remote = await photonReverseLookup(lat, lng)
+    if (remote) {
+      return {
+        ...remote,
+        id: `map-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+        lat,
+        lng,
+        zoneId: ZONE_SARAJEVO,
+      }
+    }
+  } catch {
+    // fallback below
+  }
+  const nearest = MOCK_LOCATIONS
+    .map((loc) => ({ loc, d: haversineKm({ lat, lng }, loc) }))
+    .sort((a, b) => a.d - b.d)[0]?.loc
+  if (nearest) {
+    return {
+      ...nearest,
+      id: `map-${lat.toFixed(5)}-${lng.toFixed(5)}`,
+      lat,
+      lng,
+      zoneId: ZONE_SARAJEVO,
+    }
+  }
   return {
     id: `map-${lat.toFixed(5)}-${lng.toFixed(5)}`,
     label: `Tačka na mapi (${lat.toFixed(4)}, ${lng.toFixed(4)})`,

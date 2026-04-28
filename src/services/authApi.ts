@@ -56,6 +56,8 @@ export async function register(data: RegisterInput): Promise<{ accountId: string
   db.pendingVerificationAccountIds.push(account.id)
   logActivity(account.id, 'Registracija započeta')
   persist()
+  const n = strings().notifications
+  await addNotification(account.id, n.inboxAccount, n.accountCreated, 'account')
   return { accountId: account.id }
 }
 
@@ -175,15 +177,21 @@ export async function getCurrentUser(): Promise<{
 
 export async function updateProfile(
   accountId: string,
-  patch: { email?: string; phone?: string }
+  patch: { firstName?: string; lastName?: string; email?: string; phone?: string }
 ): Promise<{ ok: true } | { error: string }> {
   await delay()
   const db = getDb()
   const account = db.users.find((u) => u.id === accountId)
+  const profile = db.profiles.find((p) => p.accountId === accountId)
   if (!account) return { error: 'notfound' }
+  if (!profile) return { error: 'notfound' }
+  if (patch.firstName) profile.firstName = patch.firstName.trim()
+  if (patch.lastName) profile.lastName = patch.lastName.trim()
   if (patch.email) account.email = patch.email.trim().toLowerCase()
   if (patch.phone) account.phone = patch.phone.trim()
   logActivity(accountId, 'Ažuriran profil', 'profile')
   persist()
+  const n = strings().notifications
+  await addNotification(accountId, n.inboxAccount, n.profileUpdated, 'profile')
   return { ok: true }
 }

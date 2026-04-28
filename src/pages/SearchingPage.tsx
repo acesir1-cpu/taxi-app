@@ -1,10 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
-import { assignDriver } from '../services/rideApi'
+import { assignDriver, cancelRideRequest } from '../services/rideApi'
 import { getDb } from '../services/mockDb'
 import { useToastStore } from '../store/notificationStore'
 import { Card, CardContent } from '../components/ui/card'
@@ -15,14 +15,17 @@ export function SearchingPage() {
   const t = strings()
   const { me } = useOutletContext<AppOutletContext>()
   const navigate = useNavigate()
-  const location = useLocation() as { state?: { requestId?: string } }
+  const location = useLocation() as { state?: { requestId?: string; forceNoDriversDemo?: boolean } }
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
   const requestId = location.state?.requestId
+  const forceNoDriversDemo = location.state?.forceNoDriversDemo === true
   const [checked, setChecked] = useState<string[]>([])
-  const assignOnce = useRef(false)
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [state, setState] = useState<'searching' | 'no_driver'>('searching')
+  const [secondsWaiting, setSecondsWaiting] = useState(0)
+  const demoTimeoutSec = 9
 
   const candidates = useMemo(() => getDb().drivers.slice(0, 4), [])
 
@@ -31,18 +34,27 @@ export function SearchingPage() {
       navigate('/app/order', { replace: true })
       return
     }
-    if (assignOnce.current) return
-    assignOnce.current = true
     let alive = true
     ;(async () => {
-      const res = await assignDriver(requestId, me.account.id)
+      const res = forceNoDriversDemo
+        ? await Promise.race([
+            assignDriver(requestId, me.account.id, { forceNoDrivers: true }),
+            new Promise<{ error: 'no_drivers' }>((resolve) =>
+              window.setTimeout(() => resolve({ error: 'no_drivers' }), demoTimeoutSec * 1000)
+            ),
+          ])
+        : await assignDriver(requestId, me.account.id, { forceNoDrivers: false })
       if (!alive) return
       if ('error' in res) {
+        await cancelRideRequest(requestId, me.account.id)
         setFailed(true)
+        setState('no_driver')
         setLoading(false)
-        push(strings().notifications.noDrivers, 'error')
+        push(strings().order.noDrivers, 'error')
+        navigate('/app/no-driver', { state: { requestId }, replace: true })
         return
       }
+      setLoading(false)
       await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
       await qc.invalidateQueries({ queryKey: ['ride', res.ride.id] })
       navigate(`/app/ride/${res.ride.id}`, { replace: true })
@@ -50,7 +62,7 @@ export function SearchingPage() {
     return () => {
       alive = false
     }
-  }, [me.account.id, me.profile.id, navigate, push, qc, requestId])
+  }, [demoTimeoutSec, forceNoDriversDemo, me.account.id, me.profile.id, navigate, push, qc, requestId])
 
   useEffect(() => {
     if (!loading || failed) return
@@ -62,6 +74,15 @@ export function SearchingPage() {
     }, 600)
     return () => clearInterval(t)
   }, [loading, failed, candidates])
+
+  useEffect(() => {
+    if (!loading || failed) return
+    setSecondsWaiting(0)
+    const timer = window.setInterval(() => {
+      setSecondsWaiting((s) => s + 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [loading, failed])
 
   if (!requestId) return null
 
@@ -77,8 +98,17 @@ export function SearchingPage() {
             <Loader2 className="h-8 w-8 animate-spin" />
           </motion.div>
           <div>
-            <h2 className="text-lg font-semibold text-brand-navy">{t.order.searching}</h2>
+            <h2 className="text-lg font-semibold text-brand-navy">
+              {state === 'searching' ? t.order.searching : t.order.noDrivers}
+            </h2>
             <p className="mt-2 text-sm text-slate-600">{t.order.searchingSubtitle}</p>
+            {state === 'searching' ? (
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {forceNoDriversDemo
+                  ? t.order.demoCountdown.replace('{seconds}', String(Math.max(0, demoTimeoutSec - secondsWaiting)).padStart(2, '0'))
+                  : t.order.waitingTime.replace('{seconds}', String(secondsWaiting).padStart(2, '0'))}
+              </p>
+            ) : null}
           </div>
           <ul className="space-y-2 text-left text-sm">
             {candidates.map((d) => (
@@ -103,8 +133,15 @@ export function SearchingPage() {
               <Button className="w-full" onClick={() => navigate('/app/order', { replace: true })}>
                 {t.order.retry}
               </Button>
-              <Button variant="secondary" className="w-full" onClick={() => navigate('/app/order', { replace: true })}>
-                {t.order.scheduleRide}
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={async () => {
+                  await cancelRideRequest(requestId, me.account.id)
+                  navigate('/app/order', { replace: true })
+                }}
+              >
+                {t.ride.cancel}
               </Button>
             </div>
           ) : null}
