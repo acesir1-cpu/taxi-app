@@ -1,8 +1,8 @@
 import { createPortal } from 'react-dom'
-import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, TileLayer, useMap, useMapEvents, ZoomControl } from 'react-leaflet'
 import type { Location } from '../../types/domain'
 import { cn } from '../../lib/utils'
-import { destIcon, pickupIcon } from './mapIcons'
+import { destIcon, driverIcon, pickupIcon } from './mapIcons'
 import { FitBounds } from './FitBounds'
 
 export type RouteMapInteractionMode = 'mapClick' | 'centerPin'
@@ -25,6 +25,12 @@ interface RouteMapProps {
   allowTouchInteraction?: boolean
   /** Fullscreen canvas mode for mobile picking. */
   fullscreen?: boolean
+  /** Pozicija vozača (simulacija). */
+  driverPosition?: { lat: number; lng: number } | null
+  /** Isprekidana linija trenutna pozicija → preuzimanje (faza „na putu“), kao kod putnika. */
+  driverApproachToPickup?: boolean
+  /** Početna tačka simulacije (blago iscrtana do preuzimanja). */
+  driverTraceOrigin?: { lat: number; lng: number } | null
 }
 
 function MapClickHandler({
@@ -122,7 +128,13 @@ export default function RouteMap({
   setCenterLocationLabel = '',
   allowTouchInteraction = true,
   fullscreen = false,
+  driverPosition = null,
+  driverApproachToPickup = false,
 }: RouteMapProps) {
+  // Minimalist basemap: Carto Positron by default.
+  // To switch to a dark minimalist style, replace with:
+  // https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png
+  const tileUrl = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
   const center: [number, number] = pickup
     ? [pickup.lat, pickup.lng]
     : [43.8563, 18.4131]
@@ -130,7 +142,11 @@ export default function RouteMap({
   if (pickup) positions.push([pickup.lat, pickup.lng])
   if (destination) positions.push([destination.lat, destination.lng])
   const line = routePoints.map((p) => [p.lat, p.lng] as [number, number])
-  const fitPoints = line.length > 1 ? line : positions.length ? positions : [center]
+  let fitPoints: Array<[number, number]> = line.length > 1 ? line : positions.length ? positions : [center]
+  if (driverPosition) {
+    fitPoints = [...fitPoints, [driverPosition.lat, driverPosition.lng]]
+  }
+  const showApproachLeg = Boolean(driverApproachToPickup && driverPosition && pickup)
 
   const picking = !!mapPickTarget && !!onMapPick
   const clickPick = picking && interactionMode === 'mapClick'
@@ -139,7 +155,7 @@ export default function RouteMap({
   return (
     <div
       className={cn(
-        'overflow-hidden rounded-2xl border border-black/[0.12] bg-slate-100',
+        'overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]',
         fullscreen && 'rounded-none border-0',
         picking && 'ring-2 ring-inset ring-brand-yellow/90',
         className
@@ -148,6 +164,7 @@ export default function RouteMap({
       <MapContainer
         center={center}
         zoom={13}
+        zoomControl={false}
         className={cn(
           fullscreen
             ? 'h-[100dvh] w-full min-h-[100dvh] touch-pan-x touch-pan-y'
@@ -174,12 +191,34 @@ export default function RouteMap({
           onCommit={(lat, lng) => onMapPick?.(lat, lng)}
           commitLabel={setCenterLocationLabel}
         />
-        <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer attribution='&copy; OpenStreetMap &copy; CARTO' url={tileUrl} />
+        <ZoomControl position="bottomright" />
         {line.length > 1 ? (
-          <Polyline positions={line} pathOptions={{ color: '#14B8A6', weight: 4, opacity: 0.9 }} />
+          <>
+            <Polyline
+              positions={line}
+              pathOptions={{ color: '#FFFFFF', weight: 8, opacity: 0.85, lineCap: 'round', lineJoin: 'round' }}
+            />
+            <Polyline
+              positions={line}
+              pathOptions={{ color: '#14B8A6', weight: 4, opacity: 0.95, lineCap: 'round', lineJoin: 'round' }}
+            />
+          </>
+        ) : null}
+        {showApproachLeg && driverPosition && pickup ? (
+          <Polyline
+            positions={[
+              [driverPosition.lat, driverPosition.lng],
+              [pickup.lat, pickup.lng],
+            ]}
+            pathOptions={{ color: '#F59E0B', weight: 3, opacity: 0.9, dashArray: '8 8' }}
+          />
         ) : null}
         {pickup ? <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} /> : null}
         {destination ? <Marker position={[destination.lat, destination.lng]} icon={destIcon} /> : null}
+        {driverPosition ? (
+          <Marker position={[driverPosition.lat, driverPosition.lng]} icon={driverIcon} />
+        ) : null}
         <FitBounds points={fitPoints} />
       </MapContainer>
     </div>

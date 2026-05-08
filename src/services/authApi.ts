@@ -1,5 +1,5 @@
-import type { PassengerProfile, UserAccount } from '../types/domain'
-import { strings } from '../i18n/strings'
+import type { AuthSession, PassengerProfile, UserAccount, UserRole } from '../types/domain'
+import { DEMO_DRIVER_ACCOUNT_ID } from '../data/seed'
 import { delay } from './delay'
 import { addNotification } from './notificationApi'
 import { getDb, persist } from './mockDb'
@@ -56,8 +56,7 @@ export async function register(data: RegisterInput): Promise<{ accountId: string
   db.pendingVerificationAccountIds.push(account.id)
   logActivity(account.id, 'Registracija započeta')
   persist()
-  const n = strings().notifications
-  await addNotification(account.id, n.inboxAccount, n.accountCreated, 'account')
+  await addNotification(account.id, 'inboxAccount', 'accountCreated', 'account')
   return { accountId: account.id }
 }
 
@@ -77,15 +76,14 @@ export async function verifyCode(
   user.lastLoginAt = new Date().toISOString()
   logActivity(accountId, 'Račun verifikovan')
   persist()
-  const n = strings().notifications
-  await addNotification(accountId, n.inboxAccount, n.accountActivated, 'account')
+  await addNotification(accountId, 'inboxAccount', 'accountActivated', 'account')
   return { ok: true }
 }
 
 export async function login(
   identifier: string,
   password: string
-): Promise<{ ok: true; accountId: string } | { error: string }> {
+): Promise<{ ok: true; accountId: string; role: UserRole } | { error: string }> {
   await delay()
   const idf = identifier.trim().toLowerCase()
   const db = getDb()
@@ -105,14 +103,31 @@ export async function login(
   }
   user.lastLoginAt = new Date().toISOString()
   db.currentUserId = user.id
-  logActivity(user.id, 'Prijava')
+  logActivity(user.id, user.role === 'vozac' ? 'Prijava vozača' : 'Prijava')
   persist()
-  const na = strings().notifications
-  await addNotification(user.id, na.inboxAuth, na.welcomeBack, 'auth')
-  return { ok: true, accountId: user.id }
+  await addNotification(user.id, 'inboxAuth', 'welcomeBack', 'auth')
+  return { ok: true, accountId: user.id, role: user.role }
 }
 
-export async function googleLogin(): Promise<{ ok: true; accountId: string }> {
+export async function driverDemoLogin(): Promise<{ ok: true; accountId: string; role: UserRole } | { error: string }> {
+  await delay()
+  const db = getDb()
+  const user = db.users.find((u) => u.id === DEMO_DRIVER_ACCOUNT_ID)
+  if (!user || user.role !== 'vozac') {
+    return { error: 'notfound' }
+  }
+  if (user.status === 'blokiran' || user.status === 'suspendovan') {
+    return { error: 'blocked' }
+  }
+  user.lastLoginAt = new Date().toISOString()
+  db.currentUserId = user.id
+  logActivity(user.id, 'Prijava vozača')
+  persist()
+  await addNotification(user.id, 'inboxAuth', 'driverQuickSignIn', 'auth')
+  return { ok: true, accountId: user.id, role: 'vozac' }
+}
+
+export async function googleLogin(): Promise<{ ok: true; accountId: string; role: UserRole }> {
   await delay()
   const db = getDb()
   const demo = db.users.find((u) => u.email === 'korisnik@urbanflow.ba')
@@ -121,9 +136,8 @@ export async function googleLogin(): Promise<{ ok: true; accountId: string }> {
     db.currentUserId = demo.id
     logActivity(demo.id, 'Google prijava (simulacija)')
     persist()
-    const ng = strings().notifications
-    await addNotification(demo.id, ng.inboxAuth, ng.googleLoginSimOk, 'auth')
-    return { ok: true, accountId: demo.id }
+    await addNotification(demo.id, 'inboxAuth', 'googleLoginSimOk', 'auth')
+    return { ok: true, accountId: demo.id, role: demo.role }
   }
   const account: UserAccount = {
     id: uid('acc'),
@@ -145,9 +159,8 @@ export async function googleLogin(): Promise<{ ok: true; accountId: string }> {
   })
   db.currentUserId = account.id
   persist()
-  const ng2 = strings().notifications
-  await addNotification(account.id, ng2.inboxAuth, ng2.googleAccountCreatedSim, 'auth')
-  return { ok: true, accountId: account.id }
+  await addNotification(account.id, 'inboxAuth', 'googleAccountCreatedSim', 'auth')
+  return { ok: true, accountId: account.id, role: account.role }
 }
 
 export async function logout(): Promise<void> {
@@ -157,10 +170,7 @@ export async function logout(): Promise<void> {
   persist()
 }
 
-export async function getCurrentUser(): Promise<{
-  account: UserAccount
-  profile: PassengerProfile
-} | null> {
+export async function getCurrentUser(): Promise<AuthSession | null> {
   await delay(150)
   const db = getDb()
   if (!db.currentUserId) return null
@@ -170,9 +180,14 @@ export async function getCurrentUser(): Promise<{
     persist()
     return null
   }
+  if (account.role === 'vozac') {
+    const driverProfile = db.driverProfiles.find((p) => p.accountId === account.id)
+    if (!driverProfile) return null
+    return { kind: 'driver', account, driverProfile }
+  }
   const profile = db.profiles.find((p) => p.accountId === account.id)
   if (!profile) return null
-  return { account, profile }
+  return { kind: 'passenger', account, profile }
 }
 
 export async function updateProfile(
@@ -182,8 +197,32 @@ export async function updateProfile(
   await delay()
   const db = getDb()
   const account = db.users.find((u) => u.id === accountId)
-  const profile = db.profiles.find((p) => p.accountId === accountId)
   if (!account) return { error: 'notfound' }
+  if (account.role === 'vozac') {
+    const dp = db.driverProfiles.find((p) => p.accountId === accountId)
+    if (!dp) return { error: 'notfound' }
+    if (patch.firstName) {
+      dp.firstName = patch.firstName.trim()
+      dp.fullName = `${dp.firstName} ${dp.lastName}`.trim()
+    }
+    if (patch.lastName) {
+      dp.lastName = patch.lastName.trim()
+      dp.fullName = `${dp.firstName} ${dp.lastName}`.trim()
+    }
+    if (patch.email) {
+      account.email = patch.email.trim().toLowerCase()
+      dp.email = account.email
+    }
+    if (patch.phone) {
+      account.phone = patch.phone.trim()
+      dp.phone = account.phone
+    }
+    logActivity(accountId, 'Ažuriran profil vozača', 'profile')
+    persist()
+    await addNotification(accountId, 'inboxAccount', 'profileUpdated', 'profile')
+    return { ok: true }
+  }
+  const profile = db.profiles.find((p) => p.accountId === accountId)
   if (!profile) return { error: 'notfound' }
   if (patch.firstName) profile.firstName = patch.firstName.trim()
   if (patch.lastName) profile.lastName = patch.lastName.trim()
@@ -191,7 +230,6 @@ export async function updateProfile(
   if (patch.phone) account.phone = patch.phone.trim()
   logActivity(accountId, 'Ažuriran profil', 'profile')
   persist()
-  const n = strings().notifications
-  await addNotification(accountId, n.inboxAccount, n.profileUpdated, 'profile')
+  await addNotification(accountId, 'inboxAccount', 'profileUpdated', 'profile')
   return { ok: true }
 }

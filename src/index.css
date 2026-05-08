@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @import 'leaflet/dist/leaflet.css';
 
 @tailwind base;
@@ -7,7 +7,7 @@
 
 @layer base {
   :root {
-    --app-shell-base: #e1e8f0;
+    --app-shell-base: #F6F7F9;
   }
 
   html {
@@ -26,6 +26,36 @@
 .leaflet-container {
   font-family: inherit;
   z-index: 0;
+}
+
+/* Slight warm tint across map tiles for a softer yellow tone. */
+.leaflet-tile-pane {
+  filter: sepia(0.14) saturate(1.06) hue-rotate(-8deg) brightness(1.02);
+}
+
+.leaflet-control-zoom {
+  overflow: hidden;
+  border: 1px solid rgb(148 163 184 / 0.9) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 24px rgb(2 6 23 / 0.2) !important;
+}
+
+.leaflet-control-zoom a {
+  border: 0 !important;
+  background: rgb(255 255 255 / 0.98) !important;
+  color: rgb(15 23 42) !important;
+  font-weight: 800 !important;
+  text-shadow: 0 1px 0 rgb(255 255 255 / 0.6);
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgb(254 249 195) !important;
+  color: rgb(12 74 110) !important;
+}
+
+.leaflet-control-zoom a:focus-visible {
+  outline: 2px solid rgb(250 204 21) !important;
+  outline-offset: -2px;
 }
 
 /* Welcome: blaga animacija pozadine + bokeh */
@@ -67,25 +97,228 @@
 /*
  * Logged-in shell: urban “day” side of the brand — soft grid (map/streets),
  * teal + navy glows, hint of taxi yellow, light edge depth. Keeps cards readable.
+ *
+ * The branded illustration sits on a fixed layer behind all content so it
+ * stays still while pages scroll. The image itself is already pale, so only
+ * a very light white wash is applied to keep cards crisp on top.
  */
 .app-shell-atmosphere {
+  position: relative;
   background-color: var(--app-shell-base);
+  isolation: isolate;
+}
+
+.app-shell-atmosphere::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
   background-image:
-    linear-gradient(rgba(7, 21, 39, 0.038) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(7, 21, 39, 0.038) 1px, transparent 1px),
-    radial-gradient(ellipse 125% 90% at 50% 50%, transparent 52%, rgba(7, 21, 39, 0.045) 100%),
-    radial-gradient(ellipse 110% 58% at 50% -14%, rgba(20, 184, 166, 0.12), transparent 56%),
-    radial-gradient(ellipse 60% 48% at 100% 0%, rgba(7, 21, 39, 0.075), transparent 58%),
-    radial-gradient(ellipse 55% 42% at 0% 100%, rgba(255, 196, 0, 0.09), transparent 62%),
-    linear-gradient(165deg, rgba(255, 255, 255, 0.5) 0%, transparent 38%),
-    linear-gradient(180deg, #f0f6fc 0%, #e6ecf2 32%, #dde6f0 68%, #d5dfea 100%);
-  background-size:
-    40px 40px,
-    40px 40px,
-    auto,
-    auto,
-    auto,
-    auto,
-    auto,
-    auto;
+    linear-gradient(
+      180deg,
+      rgb(246 247 249 / 0.6) 0%,
+      rgb(246 247 249 / 0.5) 45%,
+      rgb(246 247 249 / 0.6) 100%
+    ),
+    url('/app-shell-bg.png');
+  background-repeat: no-repeat, no-repeat;
+  background-size: cover, cover;
+  background-position: center, center;
+  pointer-events: none;
+}
+
+@media (max-width: 1023px) {
+  .app-shell-atmosphere::before {
+    background-image:
+      linear-gradient(
+        180deg,
+        rgb(246 247 249 / 0.78) 0%,
+        rgb(246 247 249 / 0.72) 48%,
+        rgb(246 247 249 / 0.78) 100%
+      ),
+      url('/app-shell-bg.png');
+    background-repeat: no-repeat, no-repeat;
+    background-size: cover, 185% auto;
+    background-position: center, 52% 24%;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --mobile-nav-height: clamp(4.5rem, 12vw, 5.25rem);
+    --mobile-side-pad: clamp(0.85rem, 4vw, 1.2rem);
+    --mobile-content-gap: clamp(0.7rem, 2.8vw, 1rem);
+    --mobile-card-radius: clamp(0.9rem, 3vw, 1.2rem);
+  }
+
+  html,
+  body {
+    min-height: 100%;
+  }
+
+  body {
+    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 0.4rem);
+    overscroll-behavior-y: contain;
+  }
+
+  .app-top-bar,
+  .driver-top-bar {
+    display: none;
+  }
+
+  .app-shell-atmosphere {
+    padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 1rem);
+  }
+
+  .app-shell-atmosphere::before {
+    background-size: cover, 225% auto;
+    background-position: center, 24% 24%;
+  }
+
+  .app-shell-atmosphere main {
+    gap: var(--mobile-content-gap);
+    padding: clamp(0.7rem, 3.5vw, 1rem) var(--mobile-side-pad) 0;
+  }
+
+  .passenger-mobile-nav,
+  .driver-mobile-nav {
+    min-height: var(--mobile-nav-height);
+    /* Flush to screen edges; bar background comes from Tailwind (solid card white). */
+    background: #ffffff;
+  }
+
+  .passenger-mobile-nav a,
+  .passenger-mobile-nav button,
+  .driver-mobile-nav a,
+  .driver-mobile-nav button {
+    min-height: clamp(3rem, 9.5vw, 3.5rem);
+    font-size: clamp(0.66rem, 2.5vw, 0.76rem);
+    letter-spacing: 0.01em;
+  }
+
+  h1 {
+    font-size: clamp(1.28rem, 5.8vw, 1.7rem);
+    line-height: 1.15;
+  }
+  h2 {
+    font-size: clamp(1.1rem, 4.9vw, 1.35rem);
+    line-height: 1.2;
+  }
+  h3 {
+    font-size: clamp(1rem, 4.1vw, 1.2rem);
+    line-height: 1.25;
+  }
+
+  p,
+  span,
+  li,
+  label,
+  a,
+  button {
+    word-break: break-word;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 1rem !important;
+  }
+
+  textarea {
+    min-height: 6.5rem;
+  }
+
+  button,
+  [role='button'],
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:active,
+  [role='button']:active,
+  a:active {
+    transform: scale(0.985);
+    transition: transform 120ms ease-out;
+  }
+
+  .shadow-ambient,
+  .shadow-card,
+  .shadow-card-hover {
+    box-shadow: 0 0.35rem 1.2rem rgb(15 23 42 / 0.08);
+  }
+
+  [class*='rounded-2xl'],
+  [class*='rounded-[18px]'] {
+    border-radius: var(--mobile-card-radius);
+  }
+
+  .ride-mobile-action-dock {
+    position: fixed;
+    left: var(--mobile-side-pad);
+    right: var(--mobile-side-pad);
+    bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 0.5rem);
+    z-index: 112;
+    padding: clamp(0.6rem, 2.4vw, 0.85rem);
+    border: 1px solid rgb(148 163 184 / 0.24);
+    border-radius: var(--mobile-card-radius);
+    background: rgb(255 255 255 / 0.97);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 -0.25rem 1.2rem rgb(15 23 42 / 0.12);
+  }
+
+  .ride-mobile-action-dock .inline-flex,
+  .ride-mobile-action-dock button {
+    min-height: clamp(2.9rem, 12vw, 3.3rem);
+  }
+
+  .overflow-x-auto,
+  [class*='overflow-x-auto'] {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .overflow-x-auto > *,
+  [class*='overflow-x-auto'] > * {
+    scroll-snap-align: start;
+  }
+
+  .overflow-x-auto::-webkit-scrollbar,
+  [class*='overflow-x-auto']::-webkit-scrollbar {
+    display: none;
+  }
+
+  .leaflet-container {
+    min-height: clamp(16rem, 44vh, 23rem);
+  }
+
+  .active-ride-map-canvas {
+    height: clamp(20rem, 45vh, 30rem) !important;
+    min-height: 45vh;
+  }
+
+  .ride-mobile-action-dock .ride-confirm-btn {
+    order: 1;
+    min-height: clamp(3.25rem, 13vw, 3.7rem);
+    font-weight: 800;
+  }
+
+  .ride-mobile-action-dock .ride-cancel-btn {
+    order: 2;
+    background: white !important;
+    border: 1.5px solid rgb(239 68 68 / 0.75) !important;
+    color: rgb(185 28 28) !important;
+    box-shadow: none !important;
+    font-weight: 700;
+  }
+
+  .ride-mobile-action-dock .ride-problem-btn {
+    order: 3;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: rgb(71 85 105) !important;
+    font-weight: 600;
+    min-height: 2.5rem;
+  }
 }

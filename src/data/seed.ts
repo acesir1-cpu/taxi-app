@@ -1,6 +1,9 @@
 import type {
   Complaint,
   Driver,
+  DriverHistoryItem,
+  DriverUiState,
+  DriverUserProfile,
   Location,
   MockDatabase,
   PassengerProfile,
@@ -9,6 +12,12 @@ import type {
   UserAccount,
   Vehicle,
 } from '../types/domain'
+import { primeRoadRouteCache } from '../services/routingApi'
+import { SEED_ROUTES } from './seedRouteCache'
+import driverAvatarAmir from '../../vozaci-slike/charlie-green-3JmfENcL24M-unsplash.jpg'
+import driverAvatarNermin from '../../vozaci-slike/christian-buehner-DItYlc26zVI-unsplash.jpg'
+import driverAvatarEldar from '../../vozaci-slike/irene-strong-v2aKnjMbP_k-unsplash.jpg'
+import driverAvatarMirza from '../../pictures/man.png'
 
 export const ZONE_SARAJEVO = 'sarajevo_core'
 
@@ -70,6 +79,14 @@ export const MOCK_LOCATIONS: Location[] = [
     zoneId: ZONE_SARAJEVO,
   },
   {
+    id: 'loc-bcc',
+    label: 'BCC',
+    address: 'BCC, Sarajevo',
+    lat: 43.8565,
+    lng: 18.4182,
+    zoneId: ZONE_SARAJEVO,
+  },
+  {
     id: 'loc-otoka',
     label: 'Otoka',
     address: 'Otoka, Sarajevo',
@@ -119,11 +136,44 @@ export const MOCK_LOCATIONS: Location[] = [
   },
 ]
 
-function loc(id: string): Location {
+export function cloneLocation(id: string): Location {
   const l = MOCK_LOCATIONS.find((x) => x.id === id)
   if (!l) throw new Error(`Unknown location ${id}`)
   return { ...l }
 }
+
+function loc(id: string): Location {
+  return cloneLocation(id)
+}
+
+function seedRouteKey(p: { lat: number; lng: number }, d: { lat: number; lng: number }): string {
+  return `${p.lat.toFixed(5)},${p.lng.toFixed(5)}|${d.lat.toFixed(5)},${d.lng.toFixed(5)}`
+}
+
+export function simpleRoute(p: Location, d: Location): Array<{ lat: number; lng: number }> {
+  const baked = SEED_ROUTES[seedRouteKey(p, d)]
+  if (baked) return baked.routePoints.map((pt) => ({ lat: pt.lat, lng: pt.lng }))
+  const pts: Array<{ lat: number; lng: number }> = []
+  const n = 20
+  for (let i = 0; i <= n; i++) {
+    const t = i / n
+    pts.push({
+      lat: p.lat + (d.lat - p.lat) * t,
+      lng: p.lng + (d.lng - p.lng) * t,
+    })
+  }
+  return pts
+}
+
+primeRoadRouteCache(
+  Object.values(SEED_ROUTES).map((entry) => ({
+    from: entry.from,
+    to: entry.to,
+    routePoints: entry.routePoints,
+    distanceKm: entry.distanceKm,
+    durationMin: entry.durationMin,
+  })),
+)
 
 const DEMO_USER_ID = 'acc-demo-lejla'
 const DEMO_PROFILE_ID = 'prof-demo-lejla'
@@ -139,6 +189,10 @@ const demoUser: UserAccount = {
   lastLoginAt: new Date().toISOString(),
   verifiedAt: new Date(Date.now() - 86400000 * 119).toISOString(),
 }
+
+/** Prijava za demo putnika (isti podaci kao u mock bazi). */
+export const DEMO_PASSENGER_EMAIL = demoUser.email
+export const DEMO_PASSENGER_PASSWORD = demoUser.passwordPlain
 
 const demoProfile: PassengerProfile = {
   id: DEMO_PROFILE_ID,
@@ -198,10 +252,11 @@ const vehicles: Vehicle[] = [
 const drivers: Driver[] = [
   {
     id: 'drv-amar',
-    firstName: 'Amar',
+    firstName: 'Amir',
     lastName: 'K.',
-    phone: '+38761110001',
-    licenseNumber: 'BH-DRV-001',
+    avatarUrl: driverAvatarAmir,
+    phone: '+38761111333',
+    licenseNumber: 'LIC-2026-001',
     availabilityStatus: 'dostupan',
     rating: 4.9,
     totalRatings: 210,
@@ -212,6 +267,7 @@ const drivers: Driver[] = [
     id: 'drv-nermin',
     firstName: 'Nermin',
     lastName: 'H.',
+    avatarUrl: driverAvatarNermin,
     phone: '+38761110002',
     licenseNumber: 'BH-DRV-002',
     availabilityStatus: 'dostupan',
@@ -224,6 +280,7 @@ const drivers: Driver[] = [
     id: 'drv-eldar',
     firstName: 'Eldar',
     lastName: 'S.',
+    avatarUrl: driverAvatarEldar,
     phone: '+38761110003',
     licenseNumber: 'BH-DRV-003',
     availabilityStatus: 'dostupan',
@@ -236,6 +293,7 @@ const drivers: Driver[] = [
     id: 'drv-mirza',
     firstName: 'Mirza',
     lastName: 'P.',
+    avatarUrl: driverAvatarMirza,
     phone: '+38761110004',
     licenseNumber: 'BH-DRV-004',
     availabilityStatus: 'van_funkcije',
@@ -245,19 +303,6 @@ const drivers: Driver[] = [
     vehicleId: 'veh-4',
   },
 ]
-
-function simpleRoute(p: Location, d: Location) {
-  const pts: Array<{ lat: number; lng: number }> = []
-  const n = 20
-  for (let i = 0; i <= n; i++) {
-    const t = i / n
-    pts.push({
-      lat: p.lat + (d.lat - p.lat) * t,
-      lng: p.lng + (d.lng - p.lng) * t,
-    })
-  }
-  return pts
-}
 
 const ride1Pickup = loc('loc-bascarsija')
 const ride1Dest = loc('loc-marijin')
@@ -423,6 +468,109 @@ const ridePast6: Ride = {
   finishedAt: new Date(Date.now() - 86400000 * 30 + 900000).toISOString(),
 }
 
+const ridePast7Pickup = loc('loc-dobrinja')
+const ridePast7Dest = loc('loc-kosevo')
+const ridePast7Route = simpleRoute(ridePast7Pickup, ridePast7Dest)
+
+const ridePast7: Ride = {
+  id: 'ride-seed-7',
+  requestId: 'req-seed-7',
+  passengerId: DEMO_PROFILE_ID,
+  driverId: 'drv-eldar',
+  vehicleId: 'veh-3',
+  status: 'neuspjesna',
+  orderType: 'odmah',
+  pickup: ridePast7Pickup,
+  destination: ridePast7Dest,
+  routePoints: ridePast7Route,
+  estimatedPrice: 14.6,
+  distanceKm: 7.3,
+  estimatedDurationMin: 16,
+  paymentMethod: 'gotovina',
+  createdAt: new Date(Date.now() - 86400000 * 16).toISOString(),
+  cancelledAt: new Date(Date.now() - 86400000 * 16 + 180000).toISOString(),
+  cancellationReason: 'Vozač nije uspio pronaći putnika',
+}
+
+const ridePast8Pickup = loc('loc-alipasino')
+const ridePast8Dest = loc('loc-bascarsija')
+const ridePast8Route = simpleRoute(ridePast8Pickup, ridePast8Dest)
+
+const ridePast8: Ride = {
+  id: 'ride-seed-8',
+  requestId: 'req-seed-8',
+  passengerId: DEMO_PROFILE_ID,
+  driverId: 'drv-nermin',
+  vehicleId: 'veh-2',
+  status: 'otkazana',
+  orderType: 'zakazano',
+  scheduledAt: new Date(Date.now() - 86400000 * 4 + 3600000).toISOString(),
+  pickup: ridePast8Pickup,
+  destination: ridePast8Dest,
+  routePoints: ridePast8Route,
+  estimatedPrice: 13.9,
+  distanceKm: 6.2,
+  estimatedDurationMin: 15,
+  paymentMethod: 'gotovina',
+  createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+  cancelledAt: new Date(Date.now() - 86400000 * 4 + 1200000).toISOString(),
+  cancellationReason: 'Zakazanu vožnju otkazao putnik',
+}
+
+const scheduledReq1Pickup = loc('loc-bcc')
+const scheduledReq1Dest = loc('loc-airport')
+const scheduledReq2Pickup = loc('loc-marijin')
+const scheduledReq2Dest = loc('loc-vogosca')
+const scheduledReq3Pickup = loc('loc-ilidza')
+const scheduledReq3Dest = loc('loc-centar')
+
+const demoScheduledRequests = [
+  {
+    id: 'req-seed-scheduled-1',
+    passengerId: DEMO_PROFILE_ID,
+    pickup: scheduledReq1Pickup,
+    destination: scheduledReq1Dest,
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    orderType: 'zakazano' as const,
+    scheduledAt: new Date(Date.now() + 86400000 * 1 + 3600000).toISOString(),
+    estimatedPrice: 19.4,
+    estimatedDurationMin: 24,
+    estimatedEtaMin: 24,
+    distanceKm: 11.8,
+    status: 'kreiran' as const,
+  },
+  {
+    id: 'req-seed-scheduled-2',
+    passengerId: DEMO_PROFILE_ID,
+    pickup: scheduledReq2Pickup,
+    destination: scheduledReq2Dest,
+    createdAt: new Date(Date.now() - 1800000).toISOString(),
+    orderType: 'zakazano' as const,
+    scheduledAt: new Date(Date.now() + 86400000 * 2 + 5400000).toISOString(),
+    estimatedPrice: 16.1,
+    estimatedDurationMin: 20,
+    estimatedEtaMin: 20,
+    distanceKm: 9.7,
+    status: 'u_obradi' as const,
+  },
+  {
+    id: 'req-seed-scheduled-3',
+    passengerId: DEMO_PROFILE_ID,
+    pickup: scheduledReq3Pickup,
+    destination: scheduledReq3Dest,
+    createdAt: new Date(Date.now() - 900000).toISOString(),
+    orderType: 'zakazano' as const,
+    scheduledAt: new Date(Date.now() + 86400000 * 3 + 2700000).toISOString(),
+    estimatedPrice: 12.2,
+    estimatedDurationMin: 16,
+    estimatedEtaMin: 16,
+    distanceKm: 7.1,
+    status: 'dodijeljen' as const,
+  },
+]
+
+const demoPassengerRides = [ridePast1, ridePast2, ridePast3, ridePast4, ridePast5, ridePast6, ridePast7, ridePast8]
+
 const ratings: Rating[] = [
   {
     id: 'rat-1',
@@ -455,15 +603,345 @@ const complaints: Complaint[] = [
   },
 ]
 
+export const DEMO_DRIVER_ACCOUNT_ID = 'acc-driver-demo-1'
+export const DEMO_DRIVER_PROFILE_ID = 'driver-demo-1'
+
+const demoDriverUser: UserAccount = {
+  id: DEMO_DRIVER_ACCOUNT_ID,
+  role: 'vozac',
+  email: 'vozac@urbanflow.ba',
+  phone: '+38761111333',
+  passwordPlain: 'Test12345',
+  status: 'aktivan',
+  createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
+  lastLoginAt: new Date().toISOString(),
+  verifiedAt: new Date(Date.now() - 86400000 * 29).toISOString(),
+}
+
+const demoDriverProfile: DriverUserProfile = {
+  id: DEMO_DRIVER_PROFILE_ID,
+  accountId: DEMO_DRIVER_ACCOUNT_ID,
+  linkedDriverId: 'drv-amar',
+  firstName: 'Amir',
+  lastName: 'K.',
+  fullName: 'Amir K.',
+  email: 'vozac@urbanflow.ba',
+  phone: '+38761111333',
+  licenseNumber: 'LIC-2026-001',
+  licenseStatus: 'validna',
+  rating: 4.9,
+  totalRides: 1284,
+  vehicle: {
+    model: 'Toyota Corolla',
+    color: 'Siva',
+    plate: 'K12-M-458',
+    status: 'dostupno',
+  },
+  registeredAt: demoDriverUser.createdAt,
+}
+
+export const DEMO_DRIVER_EMAIL = demoDriverUser.email
+export const DEMO_DRIVER_PASSWORD = demoDriverUser.passwordPlain
+
+export function createDefaultDriverUi(): DriverUiState {
+  const t0 = Date.now()
+  const history: DriverHistoryItem[] = [
+    {
+      id: 'dhist-1',
+      date: new Date(t0 - 86400000 * 1).toISOString(),
+      pickupLabel: 'Marijin Dvor',
+      destinationLabel: 'Grbavica',
+      passengerName: 'Emina S.',
+      status: 'zavrsena',
+      earningsBam: 6.5,
+      paymentMethod: 'gotovina',
+      rating: 5,
+      routeDistanceKm: 2.4,
+      durationMin: 9,
+    },
+    {
+      id: 'dhist-2',
+      date: new Date(t0 - 86400000 * 3).toISOString(),
+      pickupLabel: 'Baščaršija',
+      destinationLabel: 'Otoka',
+      passengerName: 'Tarik M.',
+      status: 'zavrsena',
+      earningsBam: 11.2,
+      paymentMethod: 'gotovina',
+      rating: 4,
+      routeDistanceKm: 5.1,
+      durationMin: 14,
+    },
+    {
+      id: 'dhist-3',
+      date: new Date(t0 - 86400000 * 5).toISOString(),
+      pickupLabel: 'BCC',
+      destinationLabel: 'Aerodrom Sarajevo',
+      passengerName: 'Selma R.',
+      status: 'zavrsena',
+      earningsBam: 19.8,
+      paymentMethod: 'gotovina',
+      rating: 5,
+      routeDistanceKm: 12.6,
+      durationMin: 24,
+    },
+    {
+      id: 'dhist-4',
+      date: new Date(t0 - 86400000 * 7).toISOString(),
+      pickupLabel: 'Grbavica',
+      destinationLabel: 'Centar',
+      passengerName: 'Adnan K.',
+      status: 'otkazana',
+      earningsBam: 0,
+      paymentMethod: 'gotovina',
+      routeDistanceKm: 3.2,
+      cancellationReason: 'Putnik otkazao',
+    },
+    {
+      id: 'dhist-5',
+      date: new Date(t0 - 86400000 * 9).toISOString(),
+      pickupLabel: 'Ilidža',
+      destinationLabel: 'Marijin Dvor',
+      passengerName: 'Ivana P.',
+      status: 'problem',
+      earningsBam: 4.0,
+      paymentMethod: 'gotovina',
+      problemType: 'GPS problem',
+      routeDistanceKm: 8.9,
+      durationMin: 18,
+    },
+    {
+      id: 'dhist-6',
+      date: new Date(t0 - 86400000 * 14).toISOString(),
+      pickupLabel: 'Otoka',
+      destinationLabel: 'Baščaršija',
+      passengerName: 'Haris B.',
+      status: 'zavrsena',
+      earningsBam: 9.4,
+      paymentMethod: 'gotovina',
+      rating: 4,
+      routeDistanceKm: 4.5,
+      durationMin: 12,
+    },
+    {
+      id: 'dhist-7',
+      date: new Date(t0 - 86400000 * 21).toISOString(),
+      pickupLabel: 'Koševo',
+      destinationLabel: 'BCC',
+      passengerName: 'Maida F.',
+      status: 'neuspjesna',
+      earningsBam: 0,
+      paymentMethod: 'gotovina',
+      routeDistanceKm: 4.0,
+      cancellationReason: 'Neispravna adresa',
+    },
+    {
+      id: 'dhist-8',
+      date: new Date(t0 - 86400000 * 28).toISOString(),
+      pickupLabel: 'Aerodrom Sarajevo',
+      destinationLabel: 'Marijin Dvor',
+      passengerName: 'Vedad L.',
+      status: 'zavrsena',
+      earningsBam: 17.5,
+      paymentMethod: 'gotovina',
+      rating: 5,
+      routeDistanceKm: 11.0,
+      durationMin: 22,
+    },
+  ]
+  const activityLog = [
+    {
+      id: 'dlog-seed-1',
+      createdAt: new Date(t0 - 1000 * 60 * 45).toISOString(),
+      kind: 'smjena' as const,
+      message: 'Smjena započeta. GPS lokacija evidentirana.',
+      meta: { lokacija: 'Sarajevo (Centar)' },
+    },
+    {
+      id: 'dlog-seed-2',
+      createdAt: new Date(t0 - 1000 * 60 * 39).toISOString(),
+      kind: 'zahtjev' as const,
+      message: 'Novi zahtjev za vožnju primljen.',
+      meta: { zahtjevId: 'req-seed-driver-1' },
+    },
+    {
+      id: 'dlog-seed-3',
+      createdAt: new Date(t0 - 1000 * 60 * 37).toISOString(),
+      kind: 'vožnja' as const,
+      message: 'Vožnja prihvaćena.',
+      meta: { vožnjaId: 'ride-seed-driver-1' },
+    },
+    {
+      id: 'dlog-seed-4',
+      createdAt: new Date(t0 - 1000 * 60 * 24).toISOString(),
+      kind: 'vožnja' as const,
+      message: 'Vožnja završena.',
+      meta: { vožnjaId: 'ride-seed-driver-1' },
+    },
+    {
+      id: 'dlog-seed-5',
+      createdAt: new Date(t0 - 1000 * 60 * 18).toISOString(),
+      kind: 'zahtjev' as const,
+      message: 'Novi zahtjev za vožnju primljen.',
+      meta: { zahtjevId: 'req-seed-driver-2' },
+    },
+    {
+      id: 'dlog-seed-6',
+      createdAt: new Date(t0 - 1000 * 60 * 6).toISOString(),
+      kind: 'status_vozaca' as const,
+      message: 'Status promijenjen: Dostupan.',
+    },
+  ]
+
+  return {
+    availabilityStatus: 'van_smjene',
+    gpsPermissionSimulated: false,
+    pendingRequest: null,
+    activeRide: null,
+    history,
+    activityLog,
+    ridesToday: 2,
+    earningsTodayBam: 27.3,
+    fuelPercent: 72,
+    acceptanceRatePercent: 94,
+    totalUnjustifiedCancels: 0,
+    adminWarningSent: false,
+    flags: {},
+    shiftClock: {
+      totalActiveSecondsToday: 0,
+      pausesToday: 0,
+      hasStartedToday: false,
+    },
+    vehicleUi: {
+      status: 'dostupno',
+      brandModel: 'Toyota Corolla',
+      color: 'Siva',
+      plate: 'K12-M-458',
+      year: 2021,
+      seatCount: 4,
+      vehicleType: 'Standard',
+      lastInspectionIso: new Date(t0 - 86400000 * 45).toISOString(),
+      nextInspectionIso: new Date(t0 + 86400000 * 320).toISOString(),
+      insuranceUntilIso: new Date(t0 + 86400000 * 200).toISOString(),
+    },
+    settings: {
+      notificationsEnabled: true,
+      gpsConsent: true,
+      shareLocationDuringShift: true,
+      shareLocationWithDispatcher: true,
+      lastGpsReadAt: new Date(t0 - 120000).toISOString(),
+      lastKnownLocationLabel: 'Sarajevo (Centar)',
+    },
+  }
+}
+
+/** Migracija / dopuna mock baze za vozački modul */
+export function ensureDriverData(db: MockDatabase): boolean {
+  let changed = false
+  if (!Array.isArray(db.driverProfiles)) {
+    db.driverProfiles = []
+    changed = true
+  }
+  if (!db.driverUiByAccountId || typeof db.driverUiByAccountId !== 'object') {
+    db.driverUiByAccountId = {}
+    changed = true
+  }
+  if (!db.users.some((u) => u.id === DEMO_DRIVER_ACCOUNT_ID)) {
+    db.users.push({ ...demoDriverUser })
+    db.driverProfiles.push({ ...demoDriverProfile })
+    db.driverUiByAccountId[DEMO_DRIVER_ACCOUNT_ID] = createDefaultDriverUi()
+    changed = true
+  } else if (!db.driverUiByAccountId[DEMO_DRIVER_ACCOUNT_ID]) {
+    db.driverUiByAccountId[DEMO_DRIVER_ACCOUNT_ID] = createDefaultDriverUi()
+    changed = true
+  }
+  if (!db.driverProfiles.some((p) => p.accountId === DEMO_DRIVER_ACCOUNT_ID)) {
+    db.driverProfiles.push({ ...demoDriverProfile })
+    changed = true
+  }
+  const demoDriverUi = db.driverUiByAccountId[DEMO_DRIVER_ACCOUNT_ID]
+  if (demoDriverUi) {
+    if (!Array.isArray(demoDriverUi.history) || demoDriverUi.history.length < 6) {
+      demoDriverUi.history = createDefaultDriverUi().history
+      changed = true
+    }
+    if (!Array.isArray(demoDriverUi.activityLog) || demoDriverUi.activityLog.length < 4) {
+      demoDriverUi.activityLog = createDefaultDriverUi().activityLog
+      changed = true
+    }
+    if ((demoDriverUi.ridesToday ?? 0) <= 0 && !demoDriverUi.activeRide) {
+      demoDriverUi.ridesToday = 2
+      changed = true
+    }
+    if ((demoDriverUi.earningsTodayBam ?? 0) <= 0 && !demoDriverUi.activeRide) {
+      demoDriverUi.earningsTodayBam = 27.3
+      changed = true
+    }
+  }
+  if (db.version < 2) {
+    db.version = 2
+    changed = true
+  }
+  const amir = db.drivers.find((d) => d.id === 'drv-amar')
+  if (amir && amir.firstName !== 'Amir') {
+    amir.firstName = 'Amir'
+    amir.lastName = 'K.'
+    amir.phone = '+38761111333'
+    amir.licenseNumber = 'LIC-2026-001'
+    changed = true
+  }
+  if (!db.passengerDemoHistoryCleared) {
+    for (const req of demoScheduledRequests) {
+      if (!db.rideRequests.some((r) => r.id === req.id)) {
+        db.rideRequests.push(structuredClone(req))
+        changed = true
+      }
+    }
+    for (const ride of demoPassengerRides) {
+      if (!db.rides.some((r) => r.id === ride.id)) {
+        db.rides.push(structuredClone(ride))
+        changed = true
+      }
+    }
+  }
+  const avatarByDriverId: Record<string, string> = {
+    'drv-amar': driverAvatarAmir,
+    'drv-nermin': driverAvatarNermin,
+    'drv-eldar': driverAvatarEldar,
+    'drv-mirza': driverAvatarMirza,
+  }
+  for (const driver of db.drivers) {
+    const seededAvatar = avatarByDriverId[driver.id]
+    if (!seededAvatar) continue
+    /** Ne prepisuj odobrene uploadane slike (data URL). */
+    if (driver.avatarUrl?.startsWith('data:')) continue
+    if (driver.avatarUrl !== seededAvatar) {
+      driver.avatarUrl = seededAvatar
+      changed = true
+    }
+  }
+  if (!Array.isArray(db.driverAvatarPendingRequests)) {
+    db.driverAvatarPendingRequests = []
+    changed = true
+  }
+  return changed
+}
+
 export function createFreshSeed(): MockDatabase {
   return {
-    version: 1,
-    users: [demoUser],
+    version: 2,
+    users: [demoUser, { ...demoDriverUser }],
     profiles: [demoProfile],
+    driverProfiles: [{ ...demoDriverProfile }],
+    driverUiByAccountId: {
+      [DEMO_DRIVER_ACCOUNT_ID]: createDefaultDriverUi(),
+    },
     drivers: structuredClone(drivers),
+    driverAvatarPendingRequests: [],
     vehicles: structuredClone(vehicles),
-    rideRequests: [],
-    rides: [ridePast1, ridePast2, ridePast3, ridePast4, ridePast5, ridePast6],
+    rideRequests: structuredClone(demoScheduledRequests),
+    rides: structuredClone(demoPassengerRides),
+    passengerDemoHistoryCleared: false,
     ratings,
     complaints,
     activityLogs: [],

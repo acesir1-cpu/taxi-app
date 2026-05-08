@@ -5,6 +5,7 @@ import { useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { strings } from '../i18n/strings'
+import { getGuestLang } from '../i18n/guestLocale'
 import type { AppOutletContext } from '../types/appContext'
 import type { ComplaintCategory } from '../types/domain'
 import { createComplaint } from '../services/problemApi'
@@ -90,6 +91,9 @@ export function ProblemPage() {
     <Card>
       <CardHeader>
         <CardTitle>{t.problem.title}</CardTitle>
+        <p className="text-xs text-slate-500">
+          {t.common.back}: {isActiveRide ? t.nav.activeRide : t.nav.history}
+        </p>
       </CardHeader>
       <CardContent>
         <form className="space-y-4" onSubmit={form.handleSubmit((v) => mut.mutate(v))}>
@@ -109,6 +113,11 @@ export function ProblemPage() {
           <div className="space-y-1.5">
             <Label htmlFor="d">{t.problem.description}</Label>
             <Textarea id="d" rows={5} {...form.register('description')} />
+            <p className="text-xs text-slate-500">
+              {getGuestLang() === 'en'
+                ? 'Include what happened, when it happened, and how we can reproduce it.'
+                : 'Navedite šta se desilo, kada se desilo i kako možemo ponoviti problem.'}
+            </p>
             {form.formState.errors.description?.message ? (
               <p className="text-xs text-brand-danger">{form.formState.errors.description.message}</p>
             ) : null}

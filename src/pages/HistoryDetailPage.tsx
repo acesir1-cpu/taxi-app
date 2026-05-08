@@ -70,6 +70,9 @@ export function HistoryDetailPage() {
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle>{t.history.detailTitle}</CardTitle>
           <RideStatusBadge status={rideDetail.status} />
+          <p className="w-full text-xs text-slate-500">
+            {t.common.back}: {t.history.title}
+          </p>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <p className="font-semibold text-brand-navy">
@@ -152,9 +155,15 @@ export function HistoryDetailPage() {
                 <Link to={`/app/rate/${rideDetail.id}`}>{t.history.rate}</Link>
               </Button>
             ) : null}
-            <Button variant="secondary" asChild>
-              <Link to={`/app/problem/${rideDetail.id}`}>{t.history.problem}</Link>
-            </Button>
+            {complaint ? (
+              <Button variant="secondary" disabled>
+                {t.history.complaintProcessing}
+              </Button>
+            ) : (
+              <Button variant="secondary" asChild>
+                <Link to={`/app/problem/${rideDetail.id}`}>{t.history.problem}</Link>
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

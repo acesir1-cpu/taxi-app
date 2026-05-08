@@ -4,12 +4,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
-import { assignDriver, cancelRideRequest } from '../services/rideApi'
+import {
+  assignDriver,
+  cancelRide,
+  cancelRideRequest,
+  getDriverById,
+  getVehicleById,
+  requestNewDriverForRide,
+  setRideStatus,
+} from '../services/rideApi'
 import { getDb } from '../services/mockDb'
 import { useToastStore } from '../store/notificationStore'
 import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Loader2 } from 'lucide-react'
+import type { Driver, Ride, Vehicle } from '../types/domain'
 
 const SEARCH_REQUEST_KEY = 'urbanflow_search_request_id'
 
@@ -51,6 +60,10 @@ export function SearchingPage() {
   const [loading, setLoading] = useState(true)
   const [state, setState] = useState<'searching' | 'no_driver'>('searching')
   const [secondsWaiting, setSecondsWaiting] = useState(0)
+  const [foundRide, setFoundRide] = useState<Ride | null>(null)
+  const [foundDriver, setFoundDriver] = useState<Driver | null>(null)
+  const [foundVehicle, setFoundVehicle] = useState<Vehicle | null>(null)
+  const [actionBusy, setActionBusy] = useState<'confirm' | 'new_driver' | 'cancel' | null>(null)
   const demoTimeoutSec = 9
 
   const candidates = useMemo(() => getDb().drivers.slice(0, 4), [])
@@ -83,10 +96,11 @@ export function SearchingPage() {
         return
       }
       setLoading(false)
-      await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
-      await qc.invalidateQueries({ queryKey: ['ride', res.ride.id] })
-      clearStoredSearchRequestId()
-      navigate(`/app/ride/${res.ride.id}`, { replace: true })
+      setFoundRide(res.ride)
+      const [driver, vehicle] = await Promise.all([getDriverById(res.ride.driverId), getVehicleById(res.ride.vehicleId)])
+      if (!alive) return
+      setFoundDriver(driver)
+      setFoundVehicle(vehicle)
     })()
     return () => {
       alive = false
@@ -114,6 +128,8 @@ export function SearchingPage() {
   }, [loading, failed])
 
   if (!requestId) return null
+
+  const showFoundModal = !!foundRide && !loading && state === 'searching'
 
   return (
     <div className="mx-auto max-w-lg space-y-6 px-4 py-10">
@@ -176,6 +192,98 @@ export function SearchingPage() {
           ) : null}
         </CardContent>
       </Card>
+      {showFoundModal ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-brand-border bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-brand-navy">{t.ride.matchFoundTitle}</h3>
+            <p className="mt-1 text-sm text-slate-600">{t.ride.matchFoundHint}</p>
+            <div className="mt-4 space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
+              <p className="font-medium text-brand-navy">
+                {foundRide?.pickup.label} → {foundRide?.destination.label}
+              </p>
+              <p className="text-slate-600">
+                {t.order.eta}: ~{foundRide?.estimatedDurationMin} {t.order.min} · {t.order.distance}:{' '}
+                {foundRide?.distanceKm.toFixed(1)} {t.order.km}
+              </p>
+              <p className="text-slate-600">
+                {t.order.estimate}: {foundRide?.estimatedPrice.toFixed(2)} {t.order.bam} · {t.order.payment}:{' '}
+                {foundRide?.paymentMethod === 'gotovina' ? t.order.cash : foundRide?.paymentMethod}
+              </p>
+              <p className="text-slate-700">
+                {foundDriver ? `${foundDriver.firstName} ${foundDriver.lastName}` : t.order.notAvailable}
+                {foundDriver ? ` · ⭐ ${foundDriver.rating.toFixed(1)}` : ''}
+              </p>
+              <p className="text-slate-500">
+                {foundVehicle
+                  ? `${foundVehicle.brand} ${foundVehicle.model} · ${foundVehicle.color} · ${foundVehicle.registration}`
+                  : t.order.notAvailable}
+              </p>
+            </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={actionBusy !== null}
+                onClick={async () => {
+                  if (!foundRide) return
+                  setActionBusy('new_driver')
+                  const res = await requestNewDriverForRide(foundRide.id, me.account.id)
+                  if ('error' in res) {
+                    push(res.error === 'no_drivers' ? t.order.noDrivers : t.common.error, 'error')
+                    setActionBusy(null)
+                    return
+                  }
+                  const [driver, vehicle] = await Promise.all([getDriverById(res.ride.driverId), getVehicleById(res.ride.vehicleId)])
+                  setFoundRide(res.ride)
+                  setFoundDriver(driver)
+                  setFoundVehicle(vehicle)
+                  setActionBusy(null)
+                  push(t.ride.newDriverAssigned, 'success')
+                }}
+              >
+                {actionBusy === 'new_driver' ? t.common.loading : t.ride.requestNewDriver}
+              </Button>
+              <Button
+                variant="danger"
+                className="flex-1"
+                disabled={actionBusy !== null}
+                onClick={async () => {
+                  if (!foundRide) return
+                  setActionBusy('cancel')
+                  await cancelRide(foundRide.id, me.account.id, t.ride.cancelByPassengerDefault)
+                  clearStoredSearchRequestId()
+                  await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
+                  await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
+                  push(t.notifications.rideCancelled, 'success')
+                  navigate('/app/order', { replace: true })
+                }}
+              >
+                {actionBusy === 'cancel' ? t.common.loading : t.ride.cancel}
+              </Button>
+              <Button
+                className="flex-1"
+                disabled={actionBusy !== null}
+                onClick={async () => {
+                  if (!foundRide) return
+                  setActionBusy('confirm')
+                  const confirmRes = await setRideStatus(foundRide.id, 'vozac_na_putu', me.account.id)
+                  if ('error' in confirmRes) {
+                    setActionBusy(null)
+                    push(t.common.error, 'error')
+                    return
+                  }
+                  await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
+                  await qc.invalidateQueries({ queryKey: ['ride', foundRide.id] })
+                  clearStoredSearchRequestId()
+                  navigate(`/app/ride/${foundRide.id}`, { replace: true })
+                }}
+              >
+                {actionBusy === 'confirm' ? t.common.loading : t.ride.confirmDriver}
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

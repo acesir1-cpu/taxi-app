@@ -1,5 +1,4 @@
 import type { Complaint, ComplaintCategory } from '../types/domain'
-import { strings } from '../i18n/strings'
 import { delay } from './delay'
 import { addNotification } from './notificationApi'
 import { getDb, persist } from './mockDb'
@@ -43,8 +42,7 @@ export async function createComplaint(
     createdAt: new Date().toISOString(),
   })
   persist()
-  const n = strings().notifications
-  await addNotification(accountId, n.inboxComplaint, n.complaintOk, 'complaint')
+  await addNotification(accountId, 'inboxComplaint', 'complaintOk', 'complaint')
   return { ok: true, complaint }
 }
 

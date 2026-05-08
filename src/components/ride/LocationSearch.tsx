@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { MapPin } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Location } from '../../types/domain'
 import { strings } from '../../i18n/strings'
 import { searchLocations } from '../../services/locationApi'
@@ -16,6 +16,7 @@ export function LocationSearch({
   onChange,
   placeholder,
   emptyHint,
+  rightAction,
 }: {
   label: string
   value: Location | null
@@ -23,6 +24,7 @@ export function LocationSearch({
   placeholder: string
   /** Poruka kada nema pogodaka (npr. nakon geokodiranja). */
   emptyHint?: string
+  rightAction?: ReactNode
 }) {
   const t = strings()
   const [q, setQ] = useState(value?.label ?? '')
@@ -67,7 +69,7 @@ export function LocationSearch({
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <Input
-          className="pl-9"
+          className={cn('h-11 pl-9', rightAction ? 'pr-11' : undefined)}
           placeholder={placeholder}
           value={q}
           onFocus={() => setOpen(true)}
@@ -77,6 +79,9 @@ export function LocationSearch({
             onChange(null)
           }}
         />
+        {rightAction ? (
+          <div className="absolute right-2 top-1/2 z-10 -translate-y-1/2">{rightAction}</div>
+        ) : null}
         {open ? (
           <ul
             className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-brand-border bg-white py-1 shadow-lg"

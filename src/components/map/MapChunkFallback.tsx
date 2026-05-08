@@ -9,7 +9,7 @@ export function MapChunkFallback({ className }: { className?: string }) {
       role="status"
       aria-busy="true"
       className={cn(
-        'flex min-h-[240px] items-center justify-center rounded-2xl border border-black/[0.12] bg-slate-100 text-sm font-medium text-slate-500 shadow-card md:min-h-[420px]',
+        'flex min-h-[240px] items-center justify-center rounded-2xl border border-slate-200/80 bg-white text-sm font-medium text-slate-500 shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:min-h-[420px]',
         className
       )}
     >

@@ -42,15 +42,23 @@ export function RateRidePage() {
     onSuccess: async (res) => {
       if ('error' in res) {
         push(res.error === 'already' ? strings().rating.already : strings().common.error, 'error')
+        await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
         navigate('/app/history', { replace: true })
         return
       }
       push(strings().notifications.ratingSaved, 'success')
       await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
       await qc.invalidateQueries({ queryKey: ['rating', rideId] })
+      await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
       navigate('/app/history', { replace: true })
     },
   })
+
+  async function onSkipRating() {
+    await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
+    await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
+    navigate('/app/history', { replace: true })
+  }
 
   if (existing.data) {
     return (
@@ -64,7 +72,11 @@ export function RateRidePage() {
   const driver = driverQuery.data
 
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-lg space-y-4">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mx-auto max-w-lg space-y-4 max-md:flex max-md:min-h-[72vh] max-md:items-center max-md:justify-center"
+    >
       <Card>
         <CardHeader>
           <CardTitle>{t.rating.title}</CardTitle>
@@ -102,7 +114,7 @@ export function RateRidePage() {
           <Button className="w-full" size="lg" disabled={mut.isPending} onClick={() => mut.mutate()}>
             {mut.isPending ? t.common.loading : t.rating.submit}
           </Button>
-          <Button variant="secondary" className="w-full" size="lg" onClick={() => navigate('/app/history', { replace: true })}>
+          <Button variant="secondary" className="w-full" size="lg" onClick={onSkipRating}>
             {t.rating.skip}
           </Button>
         </CardContent>

@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Bell, ChevronRight, Clock3, FileText, Globe2, HelpCircle, Home, LampDesk, Loader2, LogOut, Mail, MapPin, Phone, Shield, Sparkles, Star, Trash2, User } from 'lucide-react'
-import type { ComponentType, ReactNode } from 'react'
-import { useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { AlertTriangle, Bell, Camera, ChevronRight, Clock3, FileText, Globe2, HelpCircle, Home, LampDesk, Loader2, LogOut, Mail, MapPin, Phone, Shield, Sparkles, Star, Trash2, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { useLangRefresh } from '../hooks/useLangRefresh'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
 import type { Location } from '../types/domain'
@@ -16,21 +16,74 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Badge } from '../components/ui/badge'
+import { AccountProfileFormFields } from '../components/settings/AccountProfileFormFields'
+import { LogoutSection } from '../components/settings/LogoutSection'
+import { SavedLocationCard } from '../components/settings/SavedLocationCard'
+import { SettingsField } from '../components/settings/SettingsField'
+import { SettingsSectionCard } from '../components/settings/SettingsSectionCard'
+import { SecurityFeatureRow, SecuritySettingsStack } from '../components/settings/SecuritySettingsSection'
+import { SimpleModal } from '../components/settings/SimpleModal'
+import { TextAreaField } from '../components/settings/TextAreaField'
+import { ToggleRow } from '../components/settings/ToggleRow'
+import { validateAccountProfile } from '../lib/accountProfileValidation'
+import {
+  loadPassengerNotifyPrefs,
+  loadPassengerPersonalize,
+  loadPassengerProfileExtras,
+  savePassengerNotifyPrefs,
+  savePassengerPersonalize,
+  savePassengerProfileExtras,
+} from '../lib/passengerSettingsPrefs'
 import { cn } from '../lib/utils'
+import rabbitAvatar from '../../pictures/rabbit.png'
+import pandaAvatar from '../../pictures/panda.png'
+import chickenAvatar from '../../pictures/chicken.png'
+import manAvatar from '../../pictures/man.png'
+import womanOneAvatar from '../../pictures/woman (1).png'
+import girlAvatar from '../../pictures/girl.png'
+import womanAvatar from '../../pictures/woman.png'
+import boyAvatar from '../../pictures/boy.png'
+
+type AvatarPreset = {
+  id: string
+  label: { bs: string; en: string }
+  src: string
+}
+
+const AVATAR_PRESETS: AvatarPreset[] = [
+  { id: 'rabbit', label: { bs: 'Zec', en: 'Rabbit' }, src: rabbitAvatar },
+  { id: 'panda', label: { bs: 'Panda', en: 'Panda' }, src: pandaAvatar },
+  { id: 'chicken', label: { bs: 'Pilić', en: 'Chicken' }, src: chickenAvatar },
+  { id: 'man', label: { bs: 'Muškarac', en: 'Man' }, src: manAvatar },
+  { id: 'woman1', label: { bs: 'Žena 1', en: 'Woman 1' }, src: womanOneAvatar },
+  { id: 'girl', label: { bs: 'Djevojčica', en: 'Girl' }, src: girlAvatar },
+  { id: 'woman2', label: { bs: 'Žena 2', en: 'Woman 2' }, src: womanAvatar },
+  { id: 'boy', label: { bs: 'Dječak', en: 'Boy' }, src: boyAvatar },
+]
 
 export function ProfilePage() {
+  useLangRefresh()
   const t = strings()
   const { me } = useOutletContext<AppOutletContext>()
   const navigate = useNavigate()
+  const location = useLocation()
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
-  const [profileValues, setProfileValues] = useState({
-    firstName: me.profile.firstName,
-    lastName: me.profile.lastName,
-    email: me.account.email,
-    phone: me.account.phone,
+  const [profileValues, setProfileValues] = useState(() => {
+    const ex = loadPassengerProfileExtras(me.account.id)
+    const pers = loadPassengerPersonalize(me.account.id)
+    return {
+      firstName: me.profile.firstName,
+      lastName: me.profile.lastName,
+      email: me.account.email,
+      phone: me.account.phone,
+      city: ex.city,
+      address: ex.address,
+      appLang: (pers.appLang ?? getGuestLang()) as 'bs' | 'en',
+    }
   })
   const [profileErrors, setProfileErrors] = useState<Partial<Record<keyof typeof profileValues, string>>>({})
+  const [profilePhoto, setProfilePhoto] = useState(() => loadPassengerProfileExtras(me.account.id).avatarDataUrl ?? '')
   const [passwordModal, setPasswordModal] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [passwordErrors, setPasswordErrors] = useState<{ next?: string; confirm?: string }>({})
@@ -38,17 +91,10 @@ export function ProfilePage() {
   const [twoFaStep, setTwoFaStep] = useState<0 | 1 | 2 | 3>(0)
   const [twoFaCode, setTwoFaCode] = useState('')
   const [twoFaEnabled, setTwoFaEnabled] = useState(false)
-  const [notifyPrefs, setNotifyPrefs] = useState({
-    email: true,
-    push: true,
-    rides: true,
-    promos: false,
-    security: true,
-  })
+  const [notifyPrefs, setNotifyPrefs] = useState(() => loadPassengerNotifyPrefs(me.account.id))
   const historyPrefs = getHistoryPrivacyPrefs(me.account.id)
   const [locationPrefs, setLocationPrefs] = useState({ gps: true, saveHistory: historyPrefs.saveHistory })
-  const [language, setLanguage] = useState<'bs' | 'en'>(getGuestLang())
-  const [defaultRideType, setDefaultRideType] = useState<'odmah' | 'zakazi'>('odmah')
+  const [defaultRideType, setDefaultRideType] = useState<'odmah' | 'zakazi'>(() => loadPassengerPersonalize(me.account.id).defaultRideType)
   const [supportModal, setSupportModal] = useState(false)
   const [faqModal, setFaqModal] = useState(false)
   const [supportType, setSupportType] = useState<'bug' | 'improvement' | 'ui' | 'slow'>('bug')
@@ -57,6 +103,7 @@ export function ProfilePage() {
   const [supportLoading, setSupportLoading] = useState(false)
   const [policyModal, setPolicyModal] = useState(false)
   const [termsModal, setTermsModal] = useState(false)
+  const [secActivityOpen, setSecActivityOpen] = useState(false)
   const [deleteHistoryModal, setDeleteHistoryModal] = useState(false)
   const [deleteHistoryLoading, setDeleteHistoryLoading] = useState(false)
   const [deleteHistoryStep, setDeleteHistoryStep] = useState<1 | 2>(1)
@@ -71,18 +118,65 @@ export function ProfilePage() {
     ],
   })
   const [locationForm, setLocationForm] = useState({ name: '', address: '', type: 'favorit' as 'kuca' | 'posao' | 'favorit' })
-  const isEnglish = language === 'en'
-  const tr = (bs: string, en: string) => (isEnglish ? en : bs)
+  const tr = (bs: string, en: string) => (getGuestLang() === 'en' ? en : bs)
+
+  useEffect(() => {
+    const ex = loadPassengerProfileExtras(me.account.id)
+    const pers = loadPassengerPersonalize(me.account.id)
+    setProfileValues({
+      firstName: me.profile.firstName,
+      lastName: me.profile.lastName,
+      email: me.account.email,
+      phone: me.account.phone,
+      city: ex.city,
+      address: ex.address,
+      appLang: (pers.appLang ?? getGuestLang()) as 'bs' | 'en',
+    })
+    setNotifyPrefs(loadPassengerNotifyPrefs(me.account.id))
+    setDefaultRideType(pers.defaultRideType)
+    setProfilePhoto(ex.avatarDataUrl ?? '')
+    if (ex.savedLocations) {
+      setSavedLocations(ex.savedLocations)
+    }
+  }, [me.account.id, me.account.email, me.account.phone, me.profile.firstName, me.profile.lastName])
+
+  useEffect(() => {
+    if (location.hash !== '#profile-account') return
+    requestAnimationFrame(() => {
+      document.getElementById('profile-account')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [location.pathname, location.hash])
+
+  const persistNotify = (next: typeof notifyPrefs) => {
+    setNotifyPrefs(next)
+    savePassengerNotifyPrefs(me.account.id, next)
+  }
 
   const save = useMutation({
-    mutationFn: (v: typeof profileValues) => updateProfile(me.account.id, v),
-    onSuccess: async (res) => {
+    mutationFn: async (v: typeof profileValues) => {
+      const res = await updateProfile(me.account.id, {
+        firstName: v.firstName,
+        lastName: v.lastName,
+        email: v.email,
+        phone: v.phone,
+      })
+      return { res, v }
+    },
+    onSuccess: async (data) => {
+      const { res, v } = data
       if ('error' in res) {
-        push(strings().common.error, 'error')
+        push(t.common.error, 'error')
         return
       }
+      savePassengerProfileExtras(me.account.id, { city: v.city, address: v.address, avatarDataUrl: profilePhoto })
+      savePassengerPersonalize(me.account.id, {
+        ...loadPassengerPersonalize(me.account.id),
+        appLang: v.appLang,
+        defaultRideType,
+      })
+      setGuestLang(v.appLang)
       await qc.invalidateQueries({ queryKey: ['me'] })
-      push(tr('Podaci su uspješno sačuvani', 'Data saved successfully'), 'success')
+      push(tr('Profil je uspješno ažuriran.', 'Profile updated successfully.'), 'success')
     },
   })
 
@@ -102,12 +196,18 @@ export function ProfilePage() {
   }
 
   function validateProfile() {
-    const next: Partial<Record<keyof typeof profileValues, string>> = {}
-    if (!profileValues.firstName.trim()) next.firstName = tr('Ime je obavezno.', 'First name is required.')
-    if (!profileValues.lastName.trim()) next.lastName = tr('Prezime je obavezno.', 'Last name is required.')
-    if (!profileValues.phone.trim()) next.phone = tr('Telefon je obavezan.', 'Phone is required.')
-    if (!profileValues.email.trim()) next.email = tr('E-mail je obavezan.', 'Email is required.')
-    if (profileValues.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profileValues.email)) next.email = tr('Neispravan e-mail format.', 'Invalid email format.')
+    const locale = getGuestLang() === 'en' ? 'en' : 'bs'
+    const next = validateAccountProfile(
+      {
+        firstName: profileValues.firstName,
+        lastName: profileValues.lastName,
+        email: profileValues.email,
+        phone: profileValues.phone,
+        city: profileValues.city,
+        address: profileValues.address,
+      },
+      locale
+    )
     setProfileErrors(next)
     return Object.keys(next).length === 0
   }
@@ -115,6 +215,48 @@ export function ProfilePage() {
   function handleSaveProfile() {
     if (!validateProfile()) return
     save.mutate(profileValues)
+  }
+
+  function handleProfilePhotoUpload(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      push(tr('Molimo odaberite sliku.', 'Please choose an image file.'), 'error')
+      return
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      push(tr('Maksimalna veličina slike je 2 MB.', 'Maximum image size is 2 MB.'), 'error')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : ''
+      if (!dataUrl) {
+        push(tr('Greška pri učitavanju slike.', 'Error while loading image.'), 'error')
+        return
+      }
+      setProfilePhoto(dataUrl)
+      const current = loadPassengerProfileExtras(me.account.id)
+      savePassengerProfileExtras(me.account.id, { ...current, avatarDataUrl: dataUrl })
+      window.dispatchEvent(new CustomEvent('urbanflow:passenger-profile-photo-updated'))
+      push(tr('Profilna slika je ažurirana.', 'Profile photo updated.'), 'success')
+    }
+    reader.readAsDataURL(file)
+  }
+
+  function handleRemoveProfilePhoto() {
+    setProfilePhoto('')
+    const current = loadPassengerProfileExtras(me.account.id)
+    savePassengerProfileExtras(me.account.id, { ...current, avatarDataUrl: '' })
+    window.dispatchEvent(new CustomEvent('urbanflow:passenger-profile-photo-updated'))
+    push(tr('Profilna slika je uklonjena.', 'Profile photo removed.'), 'info')
+  }
+
+  function handlePresetAvatarSelect(preset: AvatarPreset) {
+    setProfilePhoto(preset.src)
+    const current = loadPassengerProfileExtras(me.account.id)
+    savePassengerProfileExtras(me.account.id, { ...current, avatarDataUrl: preset.src })
+    window.dispatchEvent(new CustomEvent('urbanflow:passenger-profile-photo-updated'))
+    push(tr('Avatar je ažuriran.', 'Avatar updated.'), 'success')
   }
 
   function handlePasswordChange() {
@@ -132,7 +274,7 @@ export function ProfilePage() {
       setPasswordLoading(false)
       setPasswordModal(false)
       setPasswordForm({ current: '', next: '', confirm: '' })
-      push(tr('Lozinka je uspješno promijenjena.', 'Password changed successfully.'), 'success')
+      push(tr('Lozinka je uspješno ažurirana.', 'Password updated successfully.'), 'success')
     }, 800)
   }
 
@@ -144,7 +286,7 @@ export function ProfilePage() {
     setTwoFaEnabled(true)
     setTwoFaStep(0)
     setTwoFaCode('')
-    push(tr('2FA je uspješno aktivirana', '2FA activated successfully'), 'success')
+    push(tr('Dvofaktorska autentifikacija je aktivirana.', 'Two-factor authentication is enabled.'), 'success')
   }
 
   function addSavedLocation() {
@@ -152,14 +294,21 @@ export function ProfilePage() {
       push(tr('Naziv i adresa su obavezni.', 'Name and address are required.'), 'error')
       return
     }
-    if (locationForm.type === 'kuca') setSavedLocations((prev) => ({ ...prev, home: locationForm.address.trim() }))
-    else if (locationForm.type === 'posao') setSavedLocations((prev) => ({ ...prev, work: locationForm.address.trim() }))
-    else {
-      setSavedLocations((prev) => ({
-        ...prev,
-        favorites: [...prev.favorites, { id: `fav-${Date.now()}`, name: locationForm.name.trim(), address: locationForm.address.trim() }],
-      }))
-    }
+    const nextSaved =
+      locationForm.type === 'kuca'
+        ? { ...savedLocations, home: locationForm.address.trim() }
+        : locationForm.type === 'posao'
+          ? { ...savedLocations, work: locationForm.address.trim() }
+          : {
+        ...savedLocations,
+        favorites: [
+          ...savedLocations.favorites,
+          { id: `fav-${Date.now()}`, name: locationForm.name.trim(), address: locationForm.address.trim() },
+        ],
+      }
+    setSavedLocations(nextSaved)
+    const current = loadPassengerProfileExtras(me.account.id)
+    savePassengerProfileExtras(me.account.id, { ...current, savedLocations: nextSaved })
     setAddLocationModal(false)
     setLocationForm({ name: '', address: '', type: 'favorit' })
     push(tr('Lokacija je uspješno sačuvana.', 'Location saved successfully.'), 'success')
@@ -196,7 +345,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto w-full max-w-[1200px] space-y-4">
       <h1 className="text-2xl font-bold text-brand-navy">{tr('Postavke', 'Settings')}</h1>
       <Card className="shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
         <CardHeader className="p-6 pb-0">
@@ -214,87 +363,210 @@ export function ProfilePage() {
           </p>
         </CardHeader>
         <CardContent className="space-y-6 p-6">
-          <SectionCard icon={User} title={tr('Profil', 'Profile')} color="bg-slate-900/90 text-white">
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label={tr('Ime', 'First name')} value={profileValues.firstName} onChange={(value) => setProfileValues((prev) => ({ ...prev, firstName: value }))} error={profileErrors.firstName} />
-              <Field label={tr('Prezime', 'Last name')} value={profileValues.lastName} onChange={(value) => setProfileValues((prev) => ({ ...prev, lastName: value }))} error={profileErrors.lastName} />
-              <Field label="E-mail" value={profileValues.email} onChange={(value) => setProfileValues((prev) => ({ ...prev, email: value }))} error={profileErrors.email} type="email" />
-              <Field label={tr('Broj telefona', 'Phone number')} value={profileValues.phone} onChange={(value) => setProfileValues((prev) => ({ ...prev, phone: value }))} error={profileErrors.phone} />
+          <SettingsSectionCard id="profile-account" icon={User} title={tr('Profil', 'Profile')} color="bg-slate-900/90 text-white">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="flex flex-col items-center gap-2 rounded-2xl border border-black/[0.08] bg-white p-4">
+                {profilePhoto ? (
+                  <img
+                    src={profilePhoto}
+                    alt={`${profileValues.firstName} ${profileValues.lastName}`}
+                    className="h-20 w-20 rounded-full border border-slate-200 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-200 text-2xl font-bold text-brand-navy">
+                    {profileValues.firstName.charAt(0)}
+                    {profileValues.lastName.charAt(0)}
+                  </div>
+                )}
+                <Label
+                  htmlFor="profile-photo-upload"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground"
+                >
+                  <Camera className="h-4 w-4" />
+                  {tr('Dodaj fotografiju', 'Add photo')}
+                </Label>
+                <Input
+                  id="profile-photo-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    handleProfilePhotoUpload(e.target.files?.[0] ?? null)
+                    e.currentTarget.value = ''
+                  }}
+                />
+                {profilePhoto ? (
+                  <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={handleRemoveProfilePhoto}>
+                    {tr('Ukloni fotografiju', 'Remove photo')}
+                  </Button>
+                ) : null}
+                <div className="w-full space-y-2 pt-1">
+                  <p className="text-center text-xs font-medium text-slate-500">
+                    {tr('...ili izaberite avatar', '...or pick an avatar')}
+                  </p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {AVATAR_PRESETS.map((preset) => {
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          className={cn(
+                            'flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-1 active:outline-none [-webkit-tap-highlight-color:transparent]',
+                            profilePhoto === preset.src
+                              ? 'ring-2 ring-amber-400/80 ring-offset-1'
+                              : 'hover:ring-2 hover:ring-slate-300 hover:ring-offset-1'
+                          )}
+                          title={getGuestLang() === 'en' ? preset.label.en : preset.label.bs}
+                          onClick={() => handlePresetAvatarSelect(preset)}
+                        >
+                          <img
+                            src={preset.src}
+                            alt={getGuestLang() === 'en' ? preset.label.en : preset.label.bs}
+                            className="h-full w-full rounded-full border border-slate-200 object-cover"
+                          />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="min-w-0 flex-1">
+                <AccountProfileFormFields
+                  values={profileValues}
+                  errors={profileErrors}
+                  onChange={(patch) => setProfileValues((prev) => ({ ...prev, ...patch }))}
+                  labels={{
+                    firstName: tr('Ime', 'First name'),
+                    lastName: tr('Prezime', 'Last name'),
+                    email: t.auth.email,
+                    phone: tr('Broj telefona', 'Phone number'),
+                    city: tr('Grad', 'City'),
+                    address: tr('Adresa (opcionalno)', 'Address (optional)'),
+                  }}
+                  afterFields={
+                    <div className="flex flex-col gap-1">
+                      <Label>{tr('Jezik aplikacije', 'App language')}</Label>
+                      <select
+                        className="h-11 w-full max-w-md rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy"
+                        value={profileValues.appLang}
+                        onChange={(e) =>
+                          setProfileValues((prev) => ({ ...prev, appLang: e.target.value as 'bs' | 'en' }))
+                        }
+                      >
+                        <option value="bs">{t.profile.langOptionBs}</option>
+                        <option value="en">{t.profile.langOptionEn}</option>
+                      </select>
+                      <p className="text-xs leading-snug text-slate-500">
+                        {tr(
+                          'Jezik aplikacije koristi se za prikaz interfejsa i obavještenja.',
+                          'App language is used for the interface and notifications.'
+                        )}
+                      </p>
+                    </div>
+                  }
+                />
+              </div>
             </div>
             <Button type="button" className="w-full sm:w-auto" disabled={save.isPending} onClick={handleSaveProfile}>
               {save.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {save.isPending ? tr('Čuvanje...', 'Saving...') : tr('Sačuvaj promjene', 'Save changes')}
             </Button>
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <SectionCard icon={Shield} title={tr('Sigurnost', 'Security')} color="bg-blue-700 text-white">
-            <div className="space-y-3">
-              <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-brand-navy">{tr('Promjena lozinke', 'Change password')}</p>
-                    <p className="text-sm text-slate-600">{tr('Ažurirajte lozinku radi veće sigurnosti naloga.', 'Update your password for better account security.')}</p>
-                  </div>
-                  <Button type="button" variant="secondary" onClick={() => setPasswordModal(true)}>{tr('Promijeni lozinku', 'Change password')}</Button>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-brand-navy">{tr('Dvofaktorska autentifikacija', 'Two-factor authentication')}</p>
-                    <p className="text-sm text-slate-600">{twoFaEnabled ? tr('2FA aktivna', '2FA enabled') : tr('2FA nije aktivirana', '2FA not enabled')}</p>
-                  </div>
-                  <Button type="button" variant={twoFaEnabled ? 'danger' : 'secondary'} onClick={() => {
-                    if (twoFaEnabled) {
-                      setTwoFaEnabled(false)
-                      push(tr('2FA je isključena.', '2FA disabled.'), 'success')
-                      return
-                    }
-                    setTwoFaStep(1)
-                  }}>
+          <SettingsSectionCard icon={Shield} title={tr('Sigurnost', 'Security')} color="bg-blue-700 text-white">
+            <SecuritySettingsStack>
+              <SecurityFeatureRow
+                title={tr('Promjena lozinke', 'Change password')}
+                description={tr('Ažurirajte lozinku radi veće sigurnosti naloga.', 'Update your password for better account security.')}
+                action={
+                  <Button type="button" variant="secondary" onClick={() => setPasswordModal(true)}>
+                    {tr('Promijeni lozinku', 'Change password')}
+                  </Button>
+                }
+              />
+              <SecurityFeatureRow
+                title={tr('Dvofaktorska autentifikacija', 'Two-factor authentication')}
+                description={
+                  twoFaEnabled
+                    ? tr('Dvofaktorska autentifikacija dodatno štiti vaš nalog.', 'Two-factor authentication helps protect your account.')
+                    : tr(
+                        'Dvofaktorska autentifikacija dodatno štiti vaš nalog. Trenutno nije aktivirana.',
+                        'Two-factor authentication helps protect your account. It is not enabled yet.'
+                      )
+                }
+                action={
+                  <Button
+                    type="button"
+                    variant={twoFaEnabled ? 'danger' : 'secondary'}
+                    onClick={() => {
+                      if (twoFaEnabled) {
+                        setTwoFaEnabled(false)
+                        push(tr('Dvofaktorska autentifikacija je isključena.', 'Two-factor authentication is disabled.'), 'success')
+                        return
+                      }
+                      setTwoFaStep(1)
+                    }}
+                  >
                     {twoFaEnabled ? tr('Isključi 2FA', 'Disable 2FA') : tr('Aktiviraj 2FA', 'Enable 2FA')}
                   </Button>
-                </div>
+                }
+              />
+              <div className="rounded-2xl border border-black/[0.08] bg-white p-4 text-sm text-slate-700">
+                <p>
+                  <span className="font-semibold text-brand-navy">{tr('Zadnja prijava', 'Last sign-in')}:</span>{' '}
+                  {me.account.lastLoginAt ? new Date(me.account.lastLoginAt).toLocaleString('bs-BA') : '—'}
+                </p>
+                <p className="mt-2">
+                  <span className="font-semibold text-brand-navy">{tr('Aktivne sesije', 'Active sessions')}:</span>{' '}
+                  {tr('Ovaj uređaj', 'This device')}
+                </p>
+                <p className="mt-2">
+                  <span className="font-semibold text-brand-navy">{tr('Automatska odjava', 'Automatic sign-out')}:</span>{' '}
+                  {tr('Nakon 8 sati neaktivnosti.', 'After 8 hours of inactivity.')}
+                </p>
+                <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setSecActivityOpen(true)}>
+                  {tr('Sigurnosne aktivnosti', 'Security activity')}
+                </Button>
               </div>
-            </div>
-          </SectionCard>
+            </SecuritySettingsStack>
+          </SettingsSectionCard>
 
-          <SectionCard icon={Bell} title={tr('Obavještenja', 'Notifications')} color="bg-emerald-600 text-white">
+          <SettingsSectionCard icon={Bell} title={tr('Obavještenja', 'Notifications')} color="bg-emerald-600 text-white">
             <ToggleRow
               title={tr('Email obavještenja', 'Email notifications')}
               description={tr('Primajte važne informacije i potvrde putem e-maila.', 'Receive important updates and confirmations by email.')}
               enabled={notifyPrefs.email}
-              onChange={(v) => setNotifyPrefs((prev) => ({ ...prev, email: v }))}
+              onChange={(v) => persistNotify({ ...notifyPrefs, email: v })}
             />
             <ToggleRow
               title={tr('Push obavještenja', 'Push notifications')}
               description={tr('Primajte informacije o dolasku vozača i statusu vožnje.', 'Get updates about driver arrival and ride status.')}
               enabled={notifyPrefs.push}
-              onChange={(v) => setNotifyPrefs((prev) => ({ ...prev, push: v }))}
+              onChange={(v) => persistNotify({ ...notifyPrefs, push: v })}
             />
             <ToggleRow
               title={tr('Obavještenja o vožnji', 'Ride notifications')}
               description={tr('Ažuriranja tokom svake aktivne vožnje.', 'Updates during every active ride.')}
               enabled={notifyPrefs.rides}
-              onChange={(v) => setNotifyPrefs((prev) => ({ ...prev, rides: v }))}
+              onChange={(v) => persistNotify({ ...notifyPrefs, rides: v })}
             />
             <ToggleRow
-              title="Promocije i popusti"
-              description="Posebne ponude i promo kodovi UrbanFlow aplikacije."
+              title={t.profile.notifyPromosTitle}
+              description={t.profile.notifyPromosDesc}
               enabled={notifyPrefs.promos}
-              onChange={(v) => setNotifyPrefs((prev) => ({ ...prev, promos: v }))}
+              onChange={(v) => persistNotify({ ...notifyPrefs, promos: v })}
             />
             <ToggleRow
               title={tr('Sigurnosna obavještenja', 'Security notifications')}
               description={tr('Preporučeno: obavijesti o prijavi, promjeni lozinke i sigurnosti.', 'Recommended: login, password, and security alerts.')}
               enabled={notifyPrefs.security}
-              onChange={(v) => setNotifyPrefs((prev) => ({ ...prev, security: v }))}
+              onChange={(v) => persistNotify({ ...notifyPrefs, security: v })}
               recommendedLabel={tr('Preporučeno', 'Recommended')}
               recommended
             />
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <SectionCard icon={MapPin} title={tr('Lokacija i privatnost', 'Location and privacy')} color="bg-cyan-700 text-white">
+          <SettingsSectionCard icon={MapPin} title={tr('Lokacija i privatnost', 'Location and privacy')} color="bg-cyan-700 text-white">
             <ToggleRow
               title={tr('Koristi GPS lokaciju', 'Use GPS location')}
               description={tr('Omogućava brže postavljanje polazišta i preciznije procjene.', 'Enables faster pickup setup and more accurate estimates.')}
@@ -330,10 +602,17 @@ export function ProfilePage() {
                 'Note: when this option is disabled, new rides are not shown or saved in history.'
               )}
             </p>
+            <button
+              type="button"
+              className="block text-left text-sm font-semibold text-blue-800 underline decoration-blue-400 underline-offset-2 hover:text-blue-950"
+              onClick={() => setPolicyModal(true)}
+            >
+              {tr('Politika privatnosti', 'Privacy policy')}
+            </button>
             <Button
               type="button"
               variant="secondary"
-              className="justify-start gap-2"
+              className="mt-3 flex justify-start gap-2"
               onClick={() => {
                 setDeleteHistoryStep(1)
                 setDeleteHistoryModal(true)
@@ -342,15 +621,15 @@ export function ProfilePage() {
               <Trash2 className="h-4 w-4 text-red-600" />
               {tr('Obriši historiju', 'Delete history')}
             </Button>
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <SectionCard icon={Star} title={tr('Favoriti i sačuvane lokacije', 'Favorites and saved locations')} color="bg-amber-500 text-brand-navy">
+          <SettingsSectionCard icon={Star} title={tr('Favoriti i sačuvane lokacije', 'Favorites and saved locations')} color="bg-amber-500 text-brand-navy">
             <div className="grid gap-3 md:grid-cols-2">
               <SavedLocationCard title={tr('Kuća', 'Home')} address={savedLocations.home} onEdit={() => { setLocationForm({ name: tr('Kuća', 'Home'), address: savedLocations.home, type: 'kuca' }); setAddLocationModal(true) }} onUse={() => selectLocationForRide(savedLocations.home)} icon={Home} editLabel={tr('Uredi', 'Edit')} useLabel={tr('Koristi za vožnju', 'Use for ride')} />
               <SavedLocationCard title={tr('Posao', 'Work')} address={savedLocations.work} onEdit={() => { setLocationForm({ name: tr('Posao', 'Work'), address: savedLocations.work, type: 'posao' }); setAddLocationModal(true) }} onUse={() => selectLocationForRide(savedLocations.work)} icon={MapPin} editLabel={tr('Uredi', 'Edit')} useLabel={tr('Koristi za vožnju', 'Use for ride')} />
             </div>
             <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
-              <p className="mb-3 font-semibold text-brand-navy">Favoriti</p>
+              <p className="mb-3 font-semibold text-brand-navy">{t.profile.favoritesHeading}</p>
               <div className="space-y-2">
                 {savedLocations.favorites.map((fav) => (
                   <div key={fav.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-black/[0.06] px-3 py-2">
@@ -364,33 +643,30 @@ export function ProfilePage() {
               </div>
             </div>
             <Button type="button" className="w-full sm:w-auto" onClick={() => setAddLocationModal(true)}>{tr('Dodaj lokaciju', 'Add location')}</Button>
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <SectionCard icon={Globe2} title={tr('Personalizacija', 'Personalization')} color="bg-indigo-600 text-white">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label>{tr('Jezik aplikacije', 'App language')}</Label>
-                <select className="h-11 w-full rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy" value={language} onChange={(e) => {
-                  const next = e.target.value as 'bs' | 'en'
-                  setLanguage(next)
-                  setGuestLang(next)
-                  push(tr('Jezik je promijenjen.', 'Language changed.'), 'success')
-                }}>
-                  <option value="bs">Bosanski</option>
-                  <option value="en">English</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label>{tr('Zadani tip vožnje', 'Default ride type')}</Label>
-                <select className="h-11 w-full rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy" value={defaultRideType} onChange={(e) => setDefaultRideType(e.target.value as 'odmah' | 'zakazi')}>
-                  <option value="odmah">{tr('Odmah', 'Now')}</option>
-                  <option value="zakazi">{tr('Zakaži', 'Schedule')}</option>
-                </select>
-              </div>
+          <SettingsSectionCard icon={Globe2} title={tr('Personalizacija', 'Personalization')} color="bg-indigo-600 text-white">
+            <div className="max-w-md space-y-1.5">
+              <Label>{tr('Zadani tip vožnje', 'Default ride type')}</Label>
+              <select
+                className="h-11 w-full rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy"
+                value={defaultRideType}
+                onChange={(e) => {
+                  const next = e.target.value as 'odmah' | 'zakazi'
+                  setDefaultRideType(next)
+                  savePassengerPersonalize(me.account.id, {
+                    ...loadPassengerPersonalize(me.account.id),
+                    defaultRideType: next,
+                  })
+                }}
+              >
+                <option value="odmah">{tr('Odmah', 'Now')}</option>
+                <option value="zakazi">{tr('Zakaži', 'Schedule')}</option>
+              </select>
             </div>
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <SectionCard icon={HelpCircle} title={tr('Podrška', 'Support')} color="bg-red-600 text-white">
+          <SettingsSectionCard icon={HelpCircle} title={tr('Podrška', 'Support')} color="bg-red-600 text-white">
             <div className="rounded-2xl border border-black/[0.08] bg-white p-4 text-sm text-slate-700">
               <p className="font-semibold text-brand-navy">{tr('Kontakt podrške', 'Support contact')}</p>
               <div className="mt-2 space-y-1.5">
@@ -403,28 +679,30 @@ export function ProfilePage() {
               <Button variant="secondary" className="w-full justify-between" onClick={() => setSupportModal(true)}>{tr('Prijavi problem', 'Report a problem')}<ChevronRight className="h-4 w-4" /></Button>
               <Button variant="secondary" className="w-full justify-between" onClick={() => setFaqModal(true)}>{tr('Česta pitanja', 'FAQ')}<ChevronRight className="h-4 w-4" /></Button>
             </div>
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <SectionCard icon={FileText} title={tr('Pravne informacije', 'Legal information')} color="bg-violet-600 text-white">
+          <SettingsSectionCard icon={FileText} title={tr('Pravne informacije', 'Legal information')} color="bg-violet-600 text-white">
             <div className="grid gap-2 sm:grid-cols-2">
               <Button variant="secondary" className="justify-between" onClick={() => setPolicyModal(true)}>{tr('Politika privatnosti', 'Privacy policy')}<ChevronRight className="h-4 w-4" /></Button>
               <Button variant="secondary" className="justify-between" onClick={() => setTermsModal(true)}>{tr('Uslovi korištenja', 'Terms of use')}<ChevronRight className="h-4 w-4" /></Button>
             </div>
             <p className="text-sm text-slate-600">{tr('Verzija aplikacije', 'App version')}: v1.0.0</p>
-          </SectionCard>
+          </SettingsSectionCard>
 
-          <section className="rounded-2xl border border-red-200 bg-red-50 p-4">
-            <h2 className="text-lg font-semibold text-red-700">{tr('Odjava', 'Logout')}</h2>
-            <p className="mt-1 text-sm text-red-700/90">{tr('Odjavite se sa ovog uređaja.', 'Log out from this device.')}</p>
-            <Button className="mt-3 w-full sm:w-auto" variant="danger" onClick={() => out.mutate()}><LogOut className="h-4 w-4" />{tr('Odjavi se', 'Log out')}</Button>
-          </section>
+          <LogoutSection
+            title={tr('Odjava', 'Logout')}
+            description={tr('Odjavite se sa ovog uređaja.', 'Log out from this device.')}
+            onLogout={() => out.mutate()}
+            ctaLabel={tr('Odjavi se', 'Log out')}
+            icon={<LogOut className="mr-2 h-4 w-4" />}
+          />
         </CardContent>
       </Card>
       <SimpleModal open={passwordModal} onClose={() => setPasswordModal(false)} title={tr('Promjena lozinke', 'Change password')} closeLabel={tr('Zatvori', 'Close')}>
         <div className="space-y-3">
-          <Field label={tr('Trenutna lozinka', 'Current password')} value={passwordForm.current} onChange={(value) => setPasswordForm((prev) => ({ ...prev, current: value }))} type="password" />
-          <Field label={tr('Nova lozinka', 'New password')} value={passwordForm.next} onChange={(value) => setPasswordForm((prev) => ({ ...prev, next: value }))} type="password" error={passwordErrors.next} />
-          <Field label={tr('Potvrdi novu lozinku', 'Confirm new password')} value={passwordForm.confirm} onChange={(value) => setPasswordForm((prev) => ({ ...prev, confirm: value }))} type="password" error={passwordErrors.confirm} />
+          <SettingsField label={tr('Trenutna lozinka', 'Current password')} value={passwordForm.current} onChange={(value) => setPasswordForm((prev) => ({ ...prev, current: value }))} type="password" />
+          <SettingsField label={tr('Nova lozinka', 'New password')} value={passwordForm.next} onChange={(value) => setPasswordForm((prev) => ({ ...prev, next: value }))} type="password" error={passwordErrors.next} />
+          <SettingsField label={tr('Potvrdi novu lozinku', 'Confirm new password')} value={passwordForm.confirm} onChange={(value) => setPasswordForm((prev) => ({ ...prev, confirm: value }))} type="password" error={passwordErrors.confirm} />
           <Button className="w-full" onClick={handlePasswordChange} disabled={passwordLoading}>{passwordLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}{passwordLoading ? tr('Mijenjanje...', 'Changing...') : tr('Promijeni lozinku', 'Change password')}</Button>
         </div>
       </SimpleModal>
@@ -447,8 +725,8 @@ export function ProfilePage() {
       </SimpleModal>
       <SimpleModal open={addLocationModal} onClose={() => setAddLocationModal(false)} title={tr('Dodaj lokaciju', 'Add location')} closeLabel={tr('Zatvori', 'Close')}>
         <div className="space-y-3">
-          <Field label={tr('Naziv lokacije', 'Location name')} value={locationForm.name} onChange={(value) => setLocationForm((prev) => ({ ...prev, name: value }))} />
-          <Field label={tr('Adresa', 'Address')} value={locationForm.address} onChange={(value) => setLocationForm((prev) => ({ ...prev, address: value }))} />
+          <SettingsField label={tr('Naziv lokacije', 'Location name')} value={locationForm.name} onChange={(value) => setLocationForm((prev) => ({ ...prev, name: value }))} />
+          <SettingsField label={tr('Adresa', 'Address')} value={locationForm.address} onChange={(value) => setLocationForm((prev) => ({ ...prev, address: value }))} />
           <div className="space-y-1.5">
             <Label>{tr('Tip', 'Type')}</Label>
             <select className="h-11 w-full rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy" value={locationForm.type} onChange={(e) => setLocationForm((prev) => ({ ...prev, type: e.target.value as 'kuca' | 'posao' | 'favorit' }))}>
@@ -522,6 +800,20 @@ export function ProfilePage() {
             <p>{tr('Otvorite "Prijavi problem", opišite šta ste očekivali i šta se desilo, pa pošaljite prijavu.', 'Open "Report a problem", describe what you expected and what happened, then submit the report.')}</p>
           </div>
         </div>
+      </SimpleModal>
+      <SimpleModal open={secActivityOpen} onClose={() => setSecActivityOpen(false)} title={tr('Sigurnosne aktivnosti', 'Security activity')} closeLabel={tr('Zatvori', 'Close')}>
+        <ul className="space-y-2 text-sm text-slate-700">
+          <li className="flex justify-between border-b border-slate-100 pb-1">
+            <span>{tr('Prijava', 'Sign-in')}</span>
+            <span className="text-slate-500">
+              {me.account.lastLoginAt ? new Date(me.account.lastLoginAt).toLocaleString('bs-BA') : '—'}
+            </span>
+          </li>
+          <li className="flex justify-between border-b border-slate-100 pb-1">
+            <span>{tr('Aktivna sesija', 'Active session')}</span>
+            <span className="text-slate-500">{tr('Ovaj uređaj', 'This device')}</span>
+          </li>
+        </ul>
       </SimpleModal>
       <SimpleModal open={policyModal} onClose={() => setPolicyModal(false)} title={tr('Politika privatnosti', 'Privacy policy')} closeLabel={tr('Zatvori', 'Close')}>
         <div className="space-y-2 text-sm leading-relaxed text-slate-700">
@@ -615,119 +907,6 @@ export function ProfilePage() {
           )}
         </div>
       </SimpleModal>
-    </div>
-  )
-}
-
-function SectionCard({ icon: Icon, title, color, children }: { icon: ComponentType<{ className?: string }>; title: string; color: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3 rounded-2xl border border-black/[0.08] bg-slate-50/60 p-4">
-      <div className="flex items-center gap-2">
-        <span className={cn('inline-flex h-8 w-8 items-center justify-center rounded-full', color)}>
-          <Icon className="h-4 w-4" />
-        </span>
-        <h2 className="text-lg font-semibold text-brand-navy">{title}</h2>
-      </div>
-      <div className="space-y-3">{children}</div>
-    </section>
-  )
-}
-
-function ToggleRow({
-  title,
-  description,
-  enabled,
-  onChange,
-  recommended,
-  recommendedLabel,
-}: {
-  title: string
-  description: string
-  enabled: boolean
-  onChange: (next: boolean) => void
-  recommended?: boolean
-  recommendedLabel?: string
-}) {
-  return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-semibold text-brand-navy">
-            {title} {recommended ? <span className="text-xs font-medium text-emerald-700">({recommendedLabel ?? 'Recommended'})</span> : null}
-          </p>
-          <p className="mt-1 text-sm text-slate-600">{description}</p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          onClick={() => onChange(!enabled)}
-          className={cn(
-            'relative inline-flex h-7 w-12 shrink-0 rounded-full transition-colors',
-            enabled ? 'bg-emerald-500' : 'bg-slate-300'
-          )}
-        >
-          <span
-            className={cn(
-              'absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-transform',
-              enabled ? 'translate-x-6' : 'translate-x-1'
-            )}
-          />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function Field({ label, value, onChange, error, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; error?: string; type?: string }) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} className="bg-white" />
-      {error ? <p className="text-xs font-medium text-brand-danger">{error}</p> : null}
-    </div>
-  )
-}
-
-function TextAreaField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <textarea value={value} onChange={(e) => onChange(e.target.value)} className="min-h-[100px] w-full rounded-xl border border-black/[0.14] bg-white px-3 py-2 text-sm text-brand-navy outline-none ring-brand-yellow/50 focus:ring-2" />
-    </div>
-  )
-}
-
-function SavedLocationCard({ title, address, onEdit, onUse, icon: Icon, editLabel, useLabel }: { title: string; address: string; onEdit: () => void; onUse: () => void; icon: ComponentType<{ className?: string }>; editLabel: string; useLabel: string }) {
-  return (
-    <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-700">
-          <Icon className="h-4 w-4" />
-        </span>
-        <p className="font-semibold text-brand-navy">{title}</p>
-      </div>
-      <p className="text-sm text-slate-600">{address}</p>
-      <div className="mt-3 flex gap-2">
-        <Button variant="secondary" size="sm" onClick={onEdit}>{editLabel}</Button>
-        <Button size="sm" onClick={onUse}>{useLabel}</Button>
-      </div>
-    </div>
-  )
-}
-
-function SimpleModal({ open, onClose, title, children, large, closeLabel }: { open: boolean; onClose: () => void; title: string; children: ReactNode; large?: boolean; closeLabel?: string }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-[120] flex items-end bg-black/45 p-0 sm:items-center sm:justify-center sm:p-6">
-      <div className={cn('max-h-[92vh] w-full overflow-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-h-[86vh] sm:rounded-2xl', large ? 'sm:max-w-2xl' : 'sm:max-w-lg')}>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <h3 className="text-lg font-semibold text-brand-navy">{title}</h3>
-          <Button variant="ghost" size="sm" onClick={onClose}>{closeLabel ?? 'Close'}</Button>
-        </div>
-        {children}
-      </div>
-      <button type="button" className="absolute inset-0 -z-10" aria-label="Zatvori modal" onClick={onClose} />
     </div>
   )
 }

@@ -2,7 +2,8 @@ import { MOCK_LOCATIONS, SERVICE_BOUNDS, ZONE_SARAJEVO } from '../data/seed'
 import type { Location, RouteEstimate } from '../types/domain'
 import { haversineKm } from '../utils/distance'
 import { estimatePriceBam } from '../utils/price'
-import { estimateDurationMin, interpolateRoute } from '../utils/route'
+import { estimateDurationMin } from '../utils/route'
+import { fetchRoadRoute } from './routingApi'
 import { delay } from './delay'
 
 const PHOTON_URL = 'https://photon.komoot.io/api/'
@@ -244,14 +245,19 @@ export async function calculateRoute(
   if (!dv.ok) return { error: 'outside' }
   const straightKm = haversineKm(pickup, destination)
   if (straightKm < 0.05) return { error: 'same' }
-  const routePoints = interpolateRoute(pickup, destination, 28)
-  const distanceKm = Math.round(straightKm * 1.15 * 100) / 100
-  const durationMin = estimateDurationMin(distanceKm, 32)
+  const route = await fetchRoadRoute(pickup, destination)
+  // Trust OSRM/cache values; fallback returns a haversine-based estimate already.
+  const distanceKm = route.distanceKm > 0
+    ? route.distanceKm
+    : Math.round(straightKm * 1.15 * 100) / 100
+  const durationMin = route.durationMin > 0
+    ? route.durationMin
+    : estimateDurationMin(distanceKm, 32)
   const estimatedPrice = estimatePriceBam(distanceKm, durationMin)
   return {
     distanceKm,
     durationMin,
-    routePoints,
+    routePoints: route.routePoints,
     estimatedPrice,
   }
 }

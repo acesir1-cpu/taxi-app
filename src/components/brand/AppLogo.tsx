@@ -12,16 +12,19 @@ type AppLogoProps = {
 }
 
 /** Taxi ikona + UF — isti izgled kao na login/auth: ravna žuta, bez sjene. */
-export function AppLogo({ variant: _variant = 'light', brandName, className }: AppLogoProps) {
+export function AppLogo({ variant = 'light', brandName, className }: AppLogoProps) {
+  void variant
   return (
-    <div className={cn('flex items-center gap-2.5', className)}>
-      <div className="flex shrink-0 items-center gap-2.5 py-0.5">
-        <CarTaxiFront className="h-9 w-9 shrink-0 text-brand-yellow" strokeWidth={2.35} aria-hidden />
-        <span className="text-3xl font-black tracking-tight text-brand-yellow sm:text-[2.125rem]">UF</span>
+    <div className={cn('flex items-center gap-2', className)}>
+      <div className="flex shrink-0 items-center gap-2">
+        <CarTaxiFront className="h-8 w-8 shrink-0 text-brand-yellow" strokeWidth={2.3} aria-hidden />
+        <span className="text-[1.75rem] font-black tracking-tight text-brand-yellow sm:text-[1.9rem]">UF</span>
       </div>
       {brandName ? (
-        <span className="hidden font-bold tracking-tight text-brand-navy sm:inline sm:max-w-[200px] sm:truncate sm:text-lg">
-          {brandName}
+        <span className="hidden items-center sm:inline-flex">
+          <span className="font-extrabold tracking-tight text-brand-navy sm:max-w-[190px] sm:truncate sm:text-base">
+            {brandName}
+          </span>
         </span>
       ) : null}
     </div>

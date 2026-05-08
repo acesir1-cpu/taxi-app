@@ -205,6 +205,15 @@ export function WelcomePage() {
             >
               {wc.support}
             </Link>
+            <span className="select-none text-stone-600" aria-hidden>
+              ·
+            </span>
+            <Link
+              to="/admin/vozaci-fotografije"
+              className="font-medium text-stone-400 underline-offset-[4px] transition-colors hover:text-stone-200 hover:underline"
+            >
+              Admin · fotografije vozača
+            </Link>
           </nav>
         </motion.div>
       </PageContainer>

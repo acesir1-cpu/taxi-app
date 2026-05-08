@@ -17,4 +17,7 @@ export function setGuestLang(lang: GuestLang): void {
   } catch {
     /* ignore */
   }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('urbanflow:lang-changed', { detail: { lang } }))
+  }
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { strings } from '../i18n/strings'
 import { verifyCode } from '../services/authApi'
@@ -56,7 +56,7 @@ export function VerifyPage() {
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           className="mx-auto w-full max-w-lg"
         >
-          <AuthCard title={t.auth.verifyTitle}>
+          <AuthCard title={t.brand} subtitle={t.auth.verifyTitle}>
             <p className="text-sm text-stone-400">{t.auth.verifyContinueRegistration}</p>
             <Button className="mt-4 w-full" onClick={() => navigate('/register')}>
               {t.welcome.register}
@@ -75,8 +75,9 @@ export function VerifyPage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto w-full max-w-lg"
       >
-        <AuthCard title={t.auth.verifyTitle} subtitle={t.auth.verifyHint}>
+        <AuthCard title={t.brand} subtitle={t.auth.verifyTitle}>
           <div className="space-y-4">
+            <p className="-mt-1 text-sm text-center text-stone-300">{t.auth.verifyHint}</p>
             <div>
               <label className="sr-only" htmlFor="code">
                 {t.auth.verifyCodeLabel}
@@ -99,11 +100,24 @@ export function VerifyPage() {
             <Button
               type="button"
               variant="secondary"
-              className="w-full border border-white/10 bg-white/95 text-brand-navy hover:bg-white"
+              className="w-full border-2 border-white/30 bg-white/[0.05] text-stone-100 hover:bg-white/[0.12] hover:text-white"
               onClick={() => push(strings().auth.codeSent, 'info')}
             >
               {t.auth.resend}
             </Button>
+            <nav className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-1 text-xs text-stone-500">
+              <Link to="/privacy" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
+                {t.welcome.privacy}
+              </Link>
+              <span className="select-none text-stone-600">·</span>
+              <Link to="/terms" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
+                {t.welcome.terms}
+              </Link>
+              <span className="select-none text-stone-600">·</span>
+              <Link to="/support" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
+                {t.welcome.support}
+              </Link>
+            </nav>
           </div>
         </AuthCard>
       </motion.div>
