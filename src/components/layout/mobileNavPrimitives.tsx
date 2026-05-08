@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { strings } from '../../i18n/strings'
 import { cn } from '../../lib/utils'
 
 /** Bottom tab bar shell shared by passenger and driver (mobile). Matches primary app cards: solid white, 1px slate border. */
@@ -16,11 +18,32 @@ export function mobileTabBarItemClass(isActive: boolean) {
   )
 }
 
+/** @deprecated Use mobileNavOverflowSheetRowBase + divider classes for bottom sheet rows. */
 export const mobileNavOverflowMenuLinkClassName =
-  'flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-brand-navy'
+  'flex h-14 w-full items-center gap-3 border-b border-slate-200 px-4 text-left text-[15px] font-medium text-slate-800 no-underline transition-colors active:bg-slate-50'
 
+/** @deprecated Use mobileNavOverflowSheetDangerRow. */
 export const mobileNavOverflowMenuDangerClassName =
-  'flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700'
+  'flex h-14 w-full items-center gap-3 px-4 text-left text-[15px] font-medium text-[#EF4444] no-underline transition-colors active:bg-red-50'
+
+const sheetBottomOffset =
+  'calc(var(--mobile-nav-height, 5.25rem) + env(safe-area-inset-bottom, 0px))'
+
+export const mobileNavOverflowSheetRowBase =
+  'flex h-14 w-full shrink-0 items-center gap-3 px-4 text-left text-[15px] font-medium text-slate-800 no-underline transition-colors active:bg-slate-50'
+
+export const mobileNavOverflowSheetIconClass = 'h-5 w-5 shrink-0 text-slate-600'
+
+export const mobileNavOverflowSheetRowDivider = 'border-b border-slate-200'
+
+export const mobileNavOverflowSheetRowDividerDanger = 'border-b border-[#EF4444]'
+
+export const mobileNavOverflowSheetDangerRow = cn(
+  mobileNavOverflowSheetRowBase,
+  'text-[#EF4444] active:bg-red-50/80'
+)
+
+export const mobileNavOverflowSheetDangerIconClass = 'h-5 w-5 shrink-0 text-[#EF4444]'
 
 export function MobileNavOverflowMenu({
   open,
@@ -31,21 +54,47 @@ export function MobileNavOverflowMenu({
   onClose: () => void
   children: ReactNode
 }) {
-  if (!open) return null
+  const t = strings()
   return (
-    <div
-      className="fixed inset-0 z-[105] bg-black/30 lg:hidden"
-      role="presentation"
-      onClick={onClose}
-    >
-      <div
-        className="absolute inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] mx-auto w-[min(92vw,26rem)] rounded-2xl border border-slate-200 bg-white p-2.5 shadow-xl"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="space-y-1">{children}</div>
-      </div>
-    </div>
+    <AnimatePresence>
+      {open ? (
+        <motion.div
+          key="nav-overflow-backdrop"
+          role="presentation"
+          className="fixed inset-0 z-[105] bg-black/30 lg:hidden"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          onClick={onClose}
+        />
+      ) : null}
+      {open ? (
+        <motion.div
+          key="nav-overflow-sheet"
+          role="dialog"
+          aria-modal="true"
+          className="fixed left-0 right-0 z-[106] flex max-h-[min(85vh,calc(100dvh-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-t-[20px] border border-b-0 border-slate-200 bg-white shadow-[0_-8px_32px_rgba(15,23,42,0.12)] lg:hidden"
+          style={{ bottom: sheetBottomOffset }}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 32, stiffness: 380 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex shrink-0 justify-center pt-3 pb-2">
+            <button
+              type="button"
+              className="flex h-6 w-11 items-center justify-center rounded-md text-slate-400 outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+              aria-label={t.common.close}
+              onClick={onClose}
+            >
+              <span className="block h-1 w-[36px] shrink-0 rounded-full bg-[#D1D5DB]" />
+            </button>
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-1">{children}</div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }

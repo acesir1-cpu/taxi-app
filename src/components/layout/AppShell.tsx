@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
+import { cn } from '../../lib/utils'
 import { useMe } from '../../hooks/useMe'
 import { useActiveRide } from '../../hooks/useActiveRide'
 import { useLangRefresh } from '../../hooks/useLangRefresh'
@@ -27,6 +28,8 @@ export function AppShell() {
   const name = `${me.profile.firstName} ${me.profile.lastName}`
   const isOnActiveRideScreen = location.pathname === '/app/active' || location.pathname.startsWith('/app/ride/')
   const hideMobileBell = location.pathname === '/app/profile'
+  const orderMapMobileLayout = location.pathname === '/app/order'
+  const rideMapMobileLayout = isOnActiveRideScreen
 
   return (
     <div className="app-shell-atmosphere min-h-screen pb-24 lg:pb-6">
@@ -36,9 +39,22 @@ export function AppShell() {
         </span>
       </div>
       <TopBar accountId={me.account.id} name={name} />
-      <MobileFloatingNotifications accountId={me.account.id} hidden={hideMobileBell} />
-      <main className="mx-auto flex w-full max-w-[82rem] flex-col gap-5 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6">
-        {active && !isOnActiveRideScreen ? <ActiveRideBanner rideId={active.id} /> : null}
+      <MobileFloatingNotifications
+        accountId={me.account.id}
+        hidden={hideMobileBell}
+        layout={orderMapMobileLayout || rideMapMobileLayout ? 'orderMap' : 'default'}
+      />
+      <main
+        className={cn(
+          'mx-auto flex w-full max-w-[82rem] flex-col gap-5 px-4 py-4 sm:gap-6 sm:px-6 sm:py-6',
+          (orderMapMobileLayout || rideMapMobileLayout) && 'max-lg:gap-0 max-lg:px-0 max-lg:py-0'
+        )}
+      >
+        {active && !isOnActiveRideScreen ? (
+          <div className={cn((orderMapMobileLayout || rideMapMobileLayout) && 'relative z-[62]')}>
+            <ActiveRideBanner rideId={active.id} />
+          </div>
+        ) : null}
         <Outlet context={{ me, activeRide: active }} />
       </main>
       <MobileBottomNav accountId={me.account.id} name={name} />

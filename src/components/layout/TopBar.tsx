@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
-import { Bell, CalendarClock, Car, History, Inbox, LogOut, Navigation, Settings, User, UserCircle } from 'lucide-react'
+import { Bell, CalendarClock, Car, History, LogOut, Navigation, Settings, User, UserCircle } from 'lucide-react'
 import { AppLogo } from '../brand/AppLogo'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { strings } from '../../i18n/strings'
@@ -9,8 +9,8 @@ import {
   getNotifications,
   markAllRead,
   markNotificationRead,
-  notificationDisplay,
 } from '../../services/notificationApi'
+import { NotificationDropdownList } from '../notifications/NotificationDropdownList'
 import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 import { useEffect, useRef, useState } from 'react'
@@ -104,23 +104,15 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
     return () => window.removeEventListener('urbanflow:passenger-profile-photo-updated', refreshAvatar)
   }, [accountId])
 
-  function notificationTone(type: string): { container: string; dot: string } {
-    if (type === 'ride') return { container: 'border-l-2 border-l-brand-yellow', dot: 'bg-brand-yellow' }
-    if (type === 'complaint' || type === 'problem') return { container: 'border-l-2 border-l-brand-danger', dot: 'bg-brand-danger' }
-    return { container: 'border-l-2 border-l-brand-teal', dot: 'bg-brand-teal' }
-  }
-
-  function timeAgo(iso: string): string {
-    const diffMinutes = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
-    if (diffMinutes < 60) return `prije ${diffMinutes} min`
-    const diffHours = Math.floor(diffMinutes / 60)
-    if (diffHours < 24) return `prije ${diffHours} h`
-    const diffDays = Math.floor(diffHours / 24)
-    return `prije ${diffDays} d`
-  }
+  const hideOnMobileOrderMap = location.pathname === '/app/order'
 
   return (
-    <header className="app-top-bar sticky top-0 z-[280] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.03)] backdrop-blur-xl backdrop-saturate-150">
+    <header
+      className={cn(
+        'app-top-bar sticky top-0 z-[280] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.03)] backdrop-blur-xl backdrop-saturate-150',
+        hideOnMobileOrderMap && 'hidden lg:block'
+      )}
+    >
       <div className="mx-auto flex h-14 max-w-[82rem] items-center justify-between gap-3 px-4 sm:h-16 sm:gap-5 sm:px-6">
         <Link
           to="/app/order"
@@ -169,7 +161,7 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-[11px] font-semibold"
+                      className="h-7 px-2 text-[11px] font-semibold text-brand-teal hover:bg-teal-50 hover:text-brand-teal"
                       disabled={unread === 0}
                       onClick={async () => {
                         await markAllRead(accountId)
@@ -182,7 +174,7 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-[11px] font-semibold"
+                      className="h-7 px-2 text-[11px] font-semibold text-[#EF4444] hover:bg-red-50 hover:text-[#DC2626]"
                       disabled={notifications.length === 0}
                       onClick={async () => {
                         await deleteAllNotifications(accountId)
@@ -194,48 +186,16 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
                     </Button>
                   </div>
                 </div>
-                <ul className="max-h-56 space-y-1 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <li className="px-2 py-7 text-center text-sm text-slate-500">
-                      <div className="flex flex-col items-center gap-1.5">
-                        <Inbox className="h-4 w-4 text-slate-400" aria-hidden />
-                        <p className="text-sm font-medium text-slate-500">{t.common.noNotifications}</p>
-                        <p className="text-xs text-slate-400">Sve je ažurno!</p>
-                      </div>
-                    </li>
-                  ) : (
-                    notifications.slice(0, 20).map((n) => {
-                      const { title: nTitle, body: nBody } = notificationDisplay(n, t)
-                      const tone = notificationTone(n.type)
-                      const title = nTitle || nBody
-                      return (
-                      <li key={n.id}>
-                        <button
-                          type="button"
-                          className={cn(
-                            'w-full rounded-xl px-2 py-2 text-left text-sm transition-colors',
-                            tone.container,
-                            n.read ? 'hover:bg-slate-50' : 'bg-slate-50/70 hover:bg-slate-100/70'
-                          )}
-                          onClick={async () => {
-                            await markNotificationRead(n.id, accountId)
-                            await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
-                          }}
-                        >
-                          <span className="flex items-start justify-between gap-2">
-                            <span className="min-w-0">
-                              <span className={cn('block truncate font-semibold text-brand-navy', !n.read && 'font-extrabold')}>
-                                {title}
-                              </span>
-                              <span className="block text-xs text-slate-500">{timeAgo(n.createdAt)}</span>
-                            </span>
-                            {!n.read ? <span className={cn('mt-1 h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden /> : null}
-                          </span>
-                        </button>
-                      </li>
-                      )
-                    })
-                  )}
+                <ul className="max-h-72 space-y-1 overflow-y-auto">
+                  <NotificationDropdownList
+                    notifications={notifications}
+                    t={t}
+                    maxItems={20}
+                    onItemActivate={async (n) => {
+                      await markNotificationRead(n.id, accountId)
+                      await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                    }}
+                  />
                 </ul>
               </motion.div>
             ) : null}

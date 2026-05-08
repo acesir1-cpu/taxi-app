@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Car, ChevronDown, Map as MapIcon, Navigation, Wallet, X } from 'lucide-react'
+import { Car, ChevronDown, ChevronRight, CloudSun, Map as MapIcon, Navigation, Wallet, X } from 'lucide-react'
 import { demoGlassPanelClass } from '../lib/demoGlassPanel'
 import { cn } from '../lib/utils'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
@@ -19,6 +20,7 @@ import {
 } from '../services/rideApi'
 import { useToastStore } from '../store/notificationStore'
 import { LocationSearch } from '../components/ride/LocationSearch'
+import { PickupDestinationFields } from '../components/ride/PickupDestinationFields'
 import { MapChunkFallback } from '../components/map/MapChunkFallback'
 
 const RouteMap = lazy(() => import('../components/map/RouteMap'))
@@ -226,6 +228,11 @@ export function OrderPage() {
     setSameLocationError(sameLocationByDistance)
   }, [sameLocationByDistance])
 
+  const swapPickupAndDestination = useCallback(() => {
+    setPickup(destination)
+    setDestination(pickup)
+  }, [pickup, destination])
+
   function reset() {
     setPickup(null)
     setDestination(null)
@@ -367,7 +374,6 @@ export function OrderPage() {
   }
 
   const hasBothLocations = !!pickup && !!destination
-  const showMobileStickyCta = isMobileFlow && hasBothLocations
   const recentAddresses = useMemo(() => {
     const src = historyQ.data ?? []
     const unique: Location[] = []
@@ -418,51 +424,301 @@ export function OrderPage() {
           : t.order.confirmHelperReady
   const addressPlaceholder = isMobileFlow ? 'Unesite adresu' : t.order.addressPlaceholder
 
-  return (
-    <PageContainer className="!py-0">
-      <div
+  function renderRecentRidesSection(embeddedInSheet?: boolean) {
+    if (!historyPrefs.saveHistory) return null
+    return (
+      <section
         className={cn(
-          'mx-auto w-full max-w-[1200px] px-3 py-2 sm:px-4 md:px-6 md:py-12 md:pb-12',
-          isMobileFlow && (showMobileStickyCta ? 'pb-40' : 'pb-[88px]')
+          'space-y-3',
+          embeddedInSheet ? 'mt-6 border-t border-slate-200 pt-4' : 'mt-10 sm:mt-14'
         )}
       >
-        <div className="mb-3 grid gap-3 md:mb-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-          <Card className="relative rounded-2xl border border-white/75 bg-white/28 shadow-[0_0_0_1px_rgba(255,255,255,0.35)] backdrop-blur-md max-lg:-mx-2">
-            <CardContent className="space-y-3 p-4 md:p-5">
-              <div className="space-y-0.5">
-                <p className="text-sm font-semibold text-slate-600">{greeting}</p>
-                <h2 className="text-xl font-extrabold text-brand-navy md:text-2xl">{t.order.greetingQuestion}</h2>
-                <div className="flex items-center gap-2 pt-1 text-xs font-semibold md:hidden">
-                  <span className="text-brand-navy">⛅ 14°C</span>
-                  <span className="text-emerald-700">● {availableDriversNearby} {t.order.driversNearby}</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.order.quickTo}</p>
-                <div className="flex flex-wrap gap-2">
-                  {quickDestinations.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-teal/50 hover:text-brand-navy"
-                      onClick={() => setDestination(toQuickLocation(item))}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="hidden w-full rounded-2xl border border-white/75 bg-white/28 shadow-[0_0_0_1px_rgba(255,255,255,0.35)] backdrop-blur-md md:block md:max-w-[18rem]">
-            <CardContent className="space-y-2 p-5">
-              <p className="text-3xl font-extrabold text-brand-navy">⛅ 14°C</p>
-              <p className="text-base font-semibold text-slate-700">{t.order.weatherSummary}</p>
-              <p className="text-sm font-semibold text-slate-600">{userClock}</p>
-              <p className="text-base font-semibold text-emerald-700">● {availableDriversNearby} {t.order.driversNearby}</p>
-            </CardContent>
-          </Card>
+        <div className="flex items-end justify-between gap-4">
+          <h2 className="text-xl font-semibold tracking-tight text-brand-navy">{t.order.recentRidesTitle}</h2>
+          <Link
+            to="/app/history"
+            className="text-sm font-semibold text-brand-teal transition-colors duration-150 hover:text-brand-navy hover:underline"
+          >
+            {t.nav.history}
+          </Link>
         </div>
+        {historyQ.data && historyQ.data.length === 0 ? (
+          <Card>
+            <CardContent className="py-6 text-sm font-medium text-slate-600">{t.history.empty}</CardContent>
+          </Card>
+        ) : (
+          <div className={cn(isMobileFlow ? 'flex gap-3 overflow-x-auto pb-1' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3')}>
+            {buildRecentRideCards(historyQ.data ?? []).map((r) => {
+              const driver = r.driverId ? driverById.get(r.driverId) : undefined
+              const vehicle = r.vehicleId ? vehicleById.get(r.vehicleId) : undefined
+              const statusMeta = getRideStatusMeta(r.status)
+              const hasDriverOrCar = !!driver || !!vehicle
+              return (
+                <div
+                  key={r.id}
+                  className={cn(
+                    'rounded-[18px] transition-[transform,box-shadow] duration-150 ease-out hover:-translate-y-[1px] hover:shadow-card-hover',
+                    isMobileFlow ? 'w-[82vw] shrink-0' : 'block'
+                  )}
+                >
+                  <Card className="rounded-[18px] border-slate-200/90">
+                    <CardContent className="space-y-2 p-4 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate text-sm font-semibold text-brand-navy">
+                          {r.pickup.label} {'\u2192'} {r.destination.label}
+                        </p>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                            statusMeta.toneClass
+                          )}
+                        >
+                          {statusMeta.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-brand-navy tabular-nums">
+                          {(r.finalPrice ?? r.estimatedPrice).toFixed(2)} {t.order.bam}
+                        </p>
+                        <p className="text-[12px] font-medium text-slate-600">{formatRideDateTime(r.createdAt)}</p>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        {hasDriverOrCar ? (
+                          <p className="truncate text-[11px] font-medium text-slate-500">
+                            {driver ? `${driver.firstName} ${driver.lastName}` : ''}
+                            {driver && vehicle ? ' · ' : ''}
+                            {vehicle ? `${vehicle.brand} ${vehicle.model}` : ''}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] font-medium text-slate-400">{t.order.notAvailable}</p>
+                        )}
+                      </div>
+                      {isMobileFlow ? (
+                        <div className="flex gap-2 pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setPickup(r.pickup)
+                              setDestination(r.destination)
+                              push(t.history.repeat, 'success')
+                            }}
+                          >
+                            {t.history.repeat}
+                          </Button>
+                          <Button asChild variant="secondary" size="sm" className="flex-1">
+                            <Link to={`/app/history/${r.id}`}>{t.history.details}</Link>
+                          </Button>
+                        </div>
+                      ) : null}
+                    </CardContent>
+                  </Card>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  function renderScheduledSection(embeddedInSheet?: boolean) {
+    return (
+      <section
+        className={cn(
+          'mt-5 space-y-2.5',
+          embeddedInSheet && 'border-t border-slate-200 pt-4'
+        )}
+      >
+        <h2 className="text-lg font-semibold tracking-tight text-brand-navy">{t.order.scheduleRide}</h2>
+        <p className="text-sm text-slate-700">{t.order.scheduledManageDesc}</p>
+        <div className="flex justify-end">
+          <Link
+            to="/app/scheduled"
+            className="text-sm font-semibold text-brand-teal transition-colors duration-150 hover:text-brand-navy hover:underline"
+          >
+            {t.nav.scheduled}
+          </Link>
+        </div>
+        {scheduledQ.isLoading ? (
+          <p className="text-sm text-slate-500">{t.common.loading}</p>
+        ) : (scheduledQ.data?.length ?? 0) === 0 ? (
+          <Card>
+            <CardContent className="py-4 text-sm text-slate-600">{t.order.scheduledEmpty}</CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-2.5 sm:grid-cols-2">
+            {(scheduledQ.data ?? []).slice(0, 2).map((request) => (
+              <Card key={request.id} className="rounded-[18px] border-slate-200/90">
+                <CardContent className="space-y-2 p-4 text-sm">
+                  <p className="font-semibold text-brand-navy">
+                    {request.pickup.label} {'\u2192'} {request.destination.label}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {request.scheduledAt
+                      ? new Date(request.scheduledAt).toLocaleString('bs-BA', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false,
+                        })
+                      : t.order.notAvailable}
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-teal">{request.status}</span>
+                    <Button
+                      type="button"
+                      variant="outlineThin"
+                      size="sm"
+                      className="h-8 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
+                      onClick={async () => {
+                        await cancelRideRequest(request.id, me.account.id)
+                        await qc.invalidateQueries({ queryKey: ['scheduledRequests', me.profile.id] })
+                        push(t.notifications.rideCancelled, 'success')
+                      }}
+                    >
+                      {t.ride.cancel}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <PageContainer className={cn('!py-0', isMobileFlow && 'max-lg:!px-0')}>
+      <div
+        className={cn(
+          'mx-auto w-full max-w-[1200px] md:px-6 md:py-12 md:pb-12',
+          !isMobileFlow && 'px-3 py-2 sm:px-4',
+          isMobileFlow && 'pb-24'
+        )}
+      >
+        {isMobileFlow ? (
+          <>
+            <div className="fixed inset-0 z-[50] lg:hidden">
+              <div
+                ref={(node) => {
+                  mapInteractiveRef.current = node
+                  mapShellGuideRef.current = node
+                }}
+                className="h-full w-full"
+              >
+                <Suspense fallback={<MapChunkFallback className="h-full w-full border-0 bg-slate-200/80" />}>
+                  <RouteMap
+                    pickup={pickup}
+                    destination={destination}
+                    routePoints={route?.routePoints ?? []}
+                    className="h-full w-full"
+                    mapPickTarget={routeMapPickTarget}
+                    onMapPick={handleMapPick}
+                    onUserMapInteraction={() => setMapOverlayDismissed(true)}
+                    interactionMode="centerPin"
+                    setCenterLocationLabel={t.order.setCenterLocation}
+                    allowTouchInteraction={!isMobileFlow || mobileMapPicking}
+                  />
+                </Suspense>
+              </div>
+            </div>
+
+            <div
+              className="pointer-events-none fixed left-4 z-[60] lg:hidden"
+              style={{
+                top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+                right: 'calc(16px + 44px + 8px)',
+              }}
+            >
+              <div className="pointer-events-auto rounded-2xl border border-black/[0.06] bg-[rgba(255,255,255,0.92)] px-4 py-2 shadow-lg backdrop-blur-[12px]">
+                <section aria-labelledby="order-greeting-heading-mobile">
+                  <header className="space-y-0.5">
+                    <p className="text-[11px] font-medium leading-snug text-slate-500">{greeting}</p>
+                    <h2
+                      id="order-greeting-heading-mobile"
+                      className="text-base font-bold leading-tight tracking-tight text-brand-navy"
+                    >
+                      {t.order.greetingQuestion}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                      <span className="inline-flex items-center gap-1 text-xs font-semibold tabular-nums text-slate-700">
+                        <CloudSun className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
+                        14°C
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                        <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden>
+                          <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                        </span>
+                        {availableDriversNearby} {t.order.driversNearby}
+                      </span>
+                    </div>
+                  </header>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-[10px] font-semibold tracking-[0.14em] text-slate-500">{t.order.quickTo}</p>
+                    <div className="-mx-1 flex flex-nowrap gap-1.5 overflow-x-auto px-1 pb-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      {quickDestinations.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm transition active:scale-[0.98]"
+                          onClick={() => setDestination(toQuickLocation(item))}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {!isMobileFlow ? (
+          <div className="mb-3 grid gap-3 md:mb-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+            <Card className="relative max-lg:-mx-2 rounded-2xl border border-white/75 bg-white/28 shadow-[0_0_0_1px_rgba(255,255,255,0.35)] backdrop-blur-md">
+              <CardContent className="space-y-3 p-4 md:p-5">
+                <div className="space-y-0.5">
+                  <p className="text-sm font-semibold text-slate-600">{greeting}</p>
+                  <h2 className="text-xl font-extrabold text-brand-navy md:text-2xl">{t.order.greetingQuestion}</h2>
+                  <div className="flex items-center gap-2 pt-1 text-xs font-semibold md:hidden">
+                    <span className="text-brand-navy">⛅ 14°C</span>
+                    <span className="text-emerald-700">● {availableDriversNearby} {t.order.driversNearby}</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold tracking-wide text-slate-500">{t.order.quickTo}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {quickDestinations.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-teal/50 hover:text-brand-navy"
+                        onClick={() => setDestination(toQuickLocation(item))}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="hidden w-full rounded-2xl border border-white/75 bg-white/28 shadow-[0_0_0_1px_rgba(255,255,255,0.35)] backdrop-blur-md md:block md:max-w-[18rem]">
+              <CardContent className="space-y-2 p-5">
+                <p className="text-3xl font-extrabold text-brand-navy">⛅ 14°C</p>
+                <p className="text-base font-semibold text-slate-700">{t.order.weatherSummary}</p>
+                <p className="text-sm font-semibold text-slate-600">{userClock}</p>
+                <p className="text-base font-semibold text-emerald-700">● {availableDriversNearby} {t.order.driversNearby}</p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
         {!isMobileFlow ? (
         <div className="grid grid-cols-1 items-start gap-6 md:grid-cols-2">
@@ -475,30 +731,38 @@ export function OrderPage() {
               </CardHeader>
               <CardContent className="space-y-5 p-6">
                 <div ref={addressGuideRef} className="hidden space-y-5 lg:block">
-                  <LocationSearch
-                    label={t.order.pickup}
-                    value={pickup}
-                    onChange={setPickup}
-                    placeholder={t.order.addressPlaceholder}
-                    emptyHint={t.order.geocodeEmpty}
-                    rightAction={
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
-                        disabled={geoLoading}
-                        onClick={requestCurrentLocationForPickup}
-                        aria-label={t.order.useCurrentLocation}
-                      >
-                        <Navigation className="h-4 w-4" />
-                      </button>
+                  <PickupDestinationFields
+                    onSwap={swapPickupAndDestination}
+                    swapLabel={t.order.swapPickupDestination}
+                    pickup={
+                      <LocationSearch
+                        label={t.order.pickup}
+                        value={pickup}
+                        onChange={setPickup}
+                        placeholder={t.order.addressPlaceholder}
+                        emptyHint={t.order.geocodeEmpty}
+                        rightAction={
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+                            disabled={geoLoading}
+                            onClick={requestCurrentLocationForPickup}
+                            aria-label={t.order.useCurrentLocation}
+                          >
+                            <Navigation className="h-4 w-4" />
+                          </button>
+                        }
+                      />
                     }
-                  />
-                  <LocationSearch
-                    label={t.order.destination}
-                    value={destination}
-                    onChange={setDestination}
-                    placeholder={t.order.addressPlaceholder}
-                    emptyHint={t.order.geocodeEmpty}
+                    destination={
+                      <LocationSearch
+                        label={t.order.destination}
+                        value={destination}
+                        onChange={setDestination}
+                        placeholder={t.order.addressPlaceholder}
+                        emptyHint={t.order.geocodeEmpty}
+                      />
+                    }
                   />
                   {sameLocationError ? (
                     <p className="text-xs font-medium text-brand-danger">
@@ -661,100 +925,100 @@ export function OrderPage() {
       </div>
         ) : null}
 
-        <div className="mt-0 space-y-0 md:space-y-4">
-          <div className="lg:hidden">
-            <div className="relative overflow-hidden rounded-[1.15rem] border border-slate-200 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
-              <div
-                ref={(node) => {
-                  mapInteractiveRef.current = node
-                  mapShellGuideRef.current = node
-                }}
-                className="h-[34vh] min-h-[15rem] w-full"
-              >
-                <Suspense fallback={<MapChunkFallback className="h-full min-h-0 rounded-none border-0 bg-transparent shadow-none" />}>
-                  <RouteMap
-                    pickup={pickup}
-                    destination={destination}
-                    routePoints={route?.routePoints ?? []}
-                    className="h-full rounded-none border-0 shadow-none"
-                    mapPickTarget={routeMapPickTarget}
-                    onMapPick={handleMapPick}
-                    onUserMapInteraction={() => setMapOverlayDismissed(true)}
-                    interactionMode={isMobileFlow ? 'centerPin' : 'mapClick'}
-                    setCenterLocationLabel={t.order.setCenterLocation}
-                    allowTouchInteraction={!isMobileFlow || mobileMapPicking}
-                  />
-                </Suspense>
-              </div>
-              <Card className="relative -mt-4 rounded-t-[1.25rem] border-x-0 border-b-0 border-t border-slate-200 bg-white/97 shadow-none">
-                <CardContent className="space-y-3 p-4">
-                  <button
-                    type="button"
-                    className="mx-auto block h-1.5 w-12 rounded-full bg-slate-300"
-                    onClick={() => setMobileSheetExpanded((prev) => !prev)}
-                    aria-label={mobileSheetExpanded ? 'Sakrij formu' : 'Prikaži formu'}
-                  />
-                  <h1 className="text-xl font-bold tracking-tight text-brand-navy">Gdje idete?</h1>
-                  {!mobileSheetExpanded ? (
+        <div className="mt-0 space-y-0 md:space-y-4 lg:mt-10">
+          {isMobileFlow ? (
+            <div
+              className={cn(
+                'fixed inset-x-0 bottom-0 z-[70] flex flex-col rounded-t-[22px] border-t border-slate-200 bg-white shadow-[0_-8px_32px_rgba(15,23,42,0.12)] lg:hidden',
+                mobileSheetExpanded ? 'max-h-[62vh]' : 'max-h-[5.5rem]'
+              )}
+              style={{
+                paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 4.5rem + 8px)',
+              }}
+            >
+              <button
+                type="button"
+                className="mx-auto my-2.5 block h-1 w-9 shrink-0 rounded-[2px] bg-[#D1D5DB]"
+                onClick={() => setMobileSheetExpanded((prev) => !prev)}
+                aria-label={mobileSheetExpanded ? 'Sakrij formu' : 'Prikaži formu'}
+              />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4">
+                {!mobileSheetExpanded ? (
+                  <>
+                    <h1 className="text-xl font-bold tracking-tight text-brand-navy">Gdje idete?</h1>
                     <p className="text-sm text-slate-600">Dodirnite ručku da otvorite formu.</p>
-                  ) : null}
-                  {mobileSheetExpanded ? (
-                    <>
-                <LocationSearch
-                  label={t.order.pickup}
-                  value={pickup}
-                  onChange={setPickup}
-                  placeholder={addressPlaceholder}
-                  emptyHint={t.order.geocodeEmpty}
-                  rightAction={
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
-                        onClick={() => {
-                          setMapPickTarget('pickup')
-                          setMobilePickupMethod('map')
-                        }}
-                        aria-label="Odaberi polazište na karti"
-                      >
-                        <MapIcon className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
-                        disabled={geoLoading}
-                        onClick={requestCurrentLocationForPickup}
-                        aria-label={t.order.useCurrentLocation}
-                      >
-                        <Navigation className="h-4 w-4" />
-                      </button>
-                    </div>
+                  </>
+                ) : null}
+                {mobileSheetExpanded ? (
+                  <div
+                    ref={scheduleGuideRef}
+                    className="min-h-0 flex-1 space-y-3 overflow-y-auto overflow-x-hidden pb-2 pt-1"
+                  >
+                <h1 className="text-xl font-bold tracking-tight text-brand-navy">Gdje idete?</h1>
+                <PickupDestinationFields
+                  variant="sheet"
+                  onSwap={swapPickupAndDestination}
+                  swapLabel={t.order.swapPickupDestination}
+                  pickup={
+                    <LocationSearch
+                      label={t.order.pickup}
+                      value={pickup}
+                      onChange={setPickup}
+                      placeholder={addressPlaceholder}
+                      emptyHint={t.order.geocodeEmpty}
+                      rightAction={
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+                            onClick={() => {
+                              setMapPickTarget('pickup')
+                              setMobilePickupMethod('map')
+                            }}
+                            aria-label="Odaberi polazište na karti"
+                          >
+                            <MapIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+                            disabled={geoLoading}
+                            onClick={requestCurrentLocationForPickup}
+                            aria-label={t.order.useCurrentLocation}
+                          >
+                            <Navigation className="h-4 w-4" />
+                          </button>
+                        </div>
+                      }
+                    />
                   }
-                />
-                <LocationSearch
-                  label={t.order.destination}
-                  value={destination}
-                  onChange={setDestination}
-                  placeholder={addressPlaceholder}
-                  emptyHint={t.order.geocodeEmpty}
-                  rightAction={
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
-                      onClick={() => {
-                        if (!pickup) {
-                          setMapPickTarget('pickup')
-                          setMobilePickupMethod('map')
-                          push('Prvo odaberite polazište na karti.', 'info')
-                          return
-                        }
-                        setMapPickTarget('destination')
-                        setMobileDestMethod('map')
-                      }}
-                      aria-label="Odaberi odredište na karti"
-                    >
-                      <MapIcon className="h-4 w-4" />
-                    </button>
+                  destination={
+                    <LocationSearch
+                      label={t.order.destination}
+                      value={destination}
+                      onChange={setDestination}
+                      placeholder={addressPlaceholder}
+                      emptyHint={t.order.geocodeEmpty}
+                      rightAction={
+                        <button
+                          type="button"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700"
+                          onClick={() => {
+                            if (!pickup) {
+                              setMapPickTarget('pickup')
+                              setMobilePickupMethod('map')
+                              push('Prvo odaberite polazište na karti.', 'info')
+                              return
+                            }
+                            setMapPickTarget('destination')
+                            setMobileDestMethod('map')
+                          }}
+                          aria-label="Odaberi odredište na karti"
+                        >
+                          <MapIcon className="h-4 w-4" />
+                        </button>
+                      }
+                    />
                   }
                 />
                 {recentAddresses.length > 0 ? (
@@ -777,15 +1041,16 @@ export function OrderPage() {
                     </div>
                   </div>
                 ) : null}
-                <div className="space-y-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="space-y-1.5">
                   <p className="text-xs font-semibold text-slate-500">{t.order.payment}</p>
                   <button
                     type="button"
-                    className="flex w-full items-center justify-center gap-1 rounded-xl border border-brand-navy bg-brand-navy px-3 py-2 text-xs font-semibold text-white"
+                    className="flex h-11 w-full items-center gap-3 rounded-xl border-[1.5px] border-[#E5E7EB] bg-white px-3 text-sm font-semibold text-[#374151] transition active:bg-slate-50"
                     disabled
                   >
-                    <Wallet className="h-4 w-4" />
-                    {t.order.cash}
+                    <Wallet className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-left">{t.order.cash}</span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
                   </button>
                 </div>
                 <div className={cn(demoGlassPanelClass, 'px-3 py-2')}>
@@ -818,20 +1083,117 @@ export function OrderPage() {
                     </label>
                   ) : null}
                 </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 min-h-0 self-start px-2 text-xs font-medium text-slate-400 hover:bg-transparent hover:text-slate-600"
+                  onClick={reset}
+                >
+                  {t.order.reset}
+                </Button>
                 {sameLocationError ? <p className="text-xs font-medium text-brand-danger">{t.order.sameLoc}</p> : null}
                 {!hasBothLocations ? (
                   <p className="text-xs font-medium text-slate-700">
                     Dodajte polazište i odredište za procjenu cijene.
                   </p>
                 ) : null}
-                    </>
-                  ) : null}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
 
-          <div className={cn('space-y-3', isMobileFlow && 'hidden')}>
+                    <div ref={estimateGuideRef}>
+                    <Card className="rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                      <CardHeader className="p-4 pb-0">
+                        <CardTitle>{t.order.estimateCardTitle}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3 p-4 text-sm">
+                        {hasBothLocations ? (
+                          <div className="flex rounded-2xl border border-slate-200 bg-slate-100/90 p-1">
+                            <button
+                              type="button"
+                              className={cn(
+                                'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
+                                orderType === 'odmah'
+                                  ? 'bg-yellow-400 font-bold text-slate-900 shadow-[0_8px_18px_rgba(234,179,8,0.26)]'
+                                  : 'bg-transparent text-slate-600'
+                              )}
+                              onClick={() => setOrderType('odmah')}
+                            >
+                              {t.order.now}
+                            </button>
+                            <button
+                              type="button"
+                              className={cn(
+                                'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
+                                orderType === 'zakazano'
+                                  ? 'bg-brand-navy text-white shadow-sm'
+                                  : 'bg-transparent text-slate-600'
+                              )}
+                              onClick={() => setOrderType('zakazano')}
+                            >
+                              {t.order.schedule}
+                            </button>
+                          </div>
+                        ) : null}
+                        {hasBothLocations && orderType === 'zakazano' ? (
+                          <div className="space-y-2">
+                            <Label htmlFor="sched-mobile-sheet" className="text-sm font-semibold text-slate-800">
+                              {t.order.scheduleDateLabel}
+                            </Label>
+                            <Input
+                              id="sched-mobile-sheet"
+                              type="datetime-local"
+                              value={scheduledLocal}
+                              min={scheduleMin}
+                              onChange={(e) => {
+                                const next = e.target.value
+                                setScheduledLocal(next)
+                                if (next && new Date(next) < new Date()) {
+                                  push(t.order.pastSchedule, 'error')
+                                }
+                              }}
+                            />
+                          </div>
+                        ) : null}
+                        {hasBothLocations && route ? (
+                          <>
+                            <Row
+                              label={t.order.estimate}
+                              value={`${route.estimatedPrice.toFixed(2)} ${t.order.bam}`}
+                              emphasize
+                            />
+                            <Row label={t.order.distance} value={`${route.distanceKm.toFixed(2)} ${t.order.km}`} />
+                            <Row label={t.order.eta} value={`~${route.durationMin} ${t.order.min}`} />
+                            <Row label={t.order.payment} value={t.order.cash} />
+                          </>
+                        ) : (
+                          <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-slate-700">
+                              <Car className="h-4 w-4" aria-hidden />
+                            </span>
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-semibold text-brand-navy">Čekamo odabir rute...</p>
+                              <p className="text-xs font-medium text-slate-500">{na}</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                    </div>
+                    <ConfirmBlock
+                      disabled={confirmDisabled}
+                      label={confirmLabel}
+                      hint={confirmHint}
+                      onClick={() => mut.mutate()}
+                    />
+                    {renderRecentRidesSection(true)}
+                    {renderScheduledSection(true)}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {!isMobileFlow ? (
+          <div className="space-y-3">
             <div
               ref={(node) => {
                 mapInteractiveRef.current = node
@@ -942,323 +1304,81 @@ export function OrderPage() {
               </p>
             ) : null}
           </div>
-        </div>
-      </div>
-
-      {isMobileFlow ? (
-        <section className="-mt-14 space-y-2">
-          <Card className="rounded-2xl border border-slate-200 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-            <CardHeader className="p-4 pb-0">
-              <CardTitle>{t.order.estimateCardTitle}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4 text-sm">
-              {hasBothLocations ? (
-                <div className="flex rounded-2xl border border-slate-200 bg-slate-100/90 p-1">
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
-                      orderType === 'odmah'
-                        ? 'bg-yellow-400 font-bold text-slate-900 shadow-[0_8px_18px_rgba(234,179,8,0.26)]'
-                        : 'bg-transparent text-slate-600'
-                    )}
-                    onClick={() => setOrderType('odmah')}
-                  >
-                    {t.order.now}
-                  </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
-                      orderType === 'zakazano'
-                        ? 'bg-brand-navy text-white shadow-sm'
-                        : 'bg-transparent text-slate-600'
-                    )}
-                    onClick={() => setOrderType('zakazano')}
-                  >
-                    {t.order.schedule}
-                  </button>
-                </div>
-              ) : null}
-              {hasBothLocations && orderType === 'zakazano' ? (
-                <div className="space-y-2">
-                  <Label htmlFor="sched-mobile" className="text-sm font-semibold text-slate-800">
-                    {t.order.scheduleDateLabel}
-                  </Label>
-                  <Input
-                    id="sched-mobile"
-                    type="datetime-local"
-                    value={scheduledLocal}
-                    min={scheduleMin}
-                    onChange={(e) => {
-                      const next = e.target.value
-                      setScheduledLocal(next)
-                      if (next && new Date(next) < new Date()) {
-                        push(t.order.pastSchedule, 'error')
-                      }
-                    }}
-                  />
-                </div>
-              ) : null}
-              {hasBothLocations && route ? (
-                <>
-                  <Row
-                    label={t.order.estimate}
-                    value={`${route.estimatedPrice.toFixed(2)} ${t.order.bam}`}
-                    emphasize
-                  />
-                  <Row label={t.order.distance} value={`${route.distanceKm.toFixed(2)} ${t.order.km}`} />
-                  <Row label={t.order.eta} value={`~${route.durationMin} ${t.order.min}`} />
-                  <Row label={t.order.payment} value={t.order.cash} />
-                </>
-              ) : (
-                <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-slate-700">
-                    <Car className="h-4 w-4" aria-hidden />
-                  </span>
-                  <div className="space-y-0.5">
-                    <p className="text-sm font-semibold text-brand-navy">Čekamo odabir rute...</p>
-                    <p className="text-xs font-medium text-slate-500">{na}</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <p className="text-center text-xs font-medium text-slate-600">{confirmHint}</p>
-        </section>
-      ) : null}
-
-      {showMobileStickyCta ? (
-        <div className="pointer-events-none fixed inset-x-0 z-[111] px-4" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 72px)' }}>
-          <div className="pointer-events-auto mx-auto w-full max-w-2xl rounded-[18px] border border-slate-200 bg-white px-4 py-3 shadow-[0_-6px_24px_rgba(15,23,42,0.14)]">
-            <div className="mb-2 text-sm font-semibold text-slate-700">
-              {route ? `${t.order.estimate}: ${route.estimatedPrice.toFixed(2)} ${t.order.bam}` : `${t.order.estimate}: ${na}`}
-            </div>
-            <Button variant="cta" className="h-11 w-full" disabled={confirmDisabled} onClick={() => mut.mutate()}>
-              {t.order.confirm}
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {mobileMapPicking ? (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.985 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.985 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="fixed inset-0 z-[120] bg-white"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t.order.mapFullscreenTitle}
-        >
-          <div className="absolute inset-x-0 top-0 z-[950] border-b border-black/[0.08] bg-white/95 px-4 py-3 backdrop-blur-md">
-            <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
-              <h3 className="text-sm font-extrabold tracking-tight text-brand-navy">{t.order.mapFullscreenTitle}</h3>
-              <button
-                type="button"
-                onClick={closeMobileMapPicker}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.1] bg-white text-slate-700 active:scale-[0.98]"
-                aria-label={t.common.close}
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-          </div>
-
-          {showMobileMapHint ? (
-            <div className="pointer-events-none absolute inset-x-0 top-16 z-[960] flex justify-center px-4">
-              <p className="rounded-full border border-white/50 bg-white/90 px-4 py-2 text-center text-xs font-semibold text-slate-700 shadow-md backdrop-blur-md">
-                {t.order.mapMoveHint}
-              </p>
-            </div>
           ) : null}
+        </div>
 
-          <RouteMap
-            pickup={pickup}
-            destination={destination}
-            routePoints={route?.routePoints ?? []}
-            className="h-full"
-            mapPickTarget={routeMapPickTarget}
-            onMapPick={handleMapPick}
-            onUserMapInteraction={() => {
-              setMapOverlayDismissed(true)
-              setShowMobileMapHint(false)
-            }}
-            interactionMode="centerPin"
-            setCenterLocationLabel={t.order.setCenterLocation}
-            allowTouchInteraction
-            fullscreen
-          />
-
-          {mapPickTarget === 'pickup' ? (
-            <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[950] flex justify-center px-4">
-              <button
-                type="button"
-                disabled={geoLoading}
-                onClick={requestCurrentLocationForPickup}
-                className="pointer-events-auto inline-flex items-center justify-center rounded-full border border-black/[0.1] bg-white/95 px-4 py-2 text-xs font-bold text-brand-navy shadow-lg active:scale-[0.98] disabled:opacity-60"
-              >
-                {geoLoading ? t.common.loading : t.order.useCurrentLocation}
-              </button>
-            </div>
-          ) : null}
-        </motion.div>
-      ) : null}
-
-      {!historyPrefs.saveHistory ? null : (
-        <section className="mt-10 space-y-3 sm:mt-14">
-          <div className="flex items-end justify-between gap-4">
-            <h2 className="text-xl font-semibold tracking-tight text-brand-navy">{t.order.recentRidesTitle}</h2>
-            <Link
-              to="/app/history"
-              className="text-sm font-semibold text-brand-teal transition-colors duration-150 hover:text-brand-navy hover:underline"
+      {mobileMapPicking && typeof document !== 'undefined'
+        ? createPortal(
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="fixed inset-0 z-[400] bg-white"
+              role="dialog"
+              aria-modal="true"
+              aria-label={t.order.mapFullscreenTitle}
             >
-              {t.nav.history}
-            </Link>
-          </div>
-          {historyQ.data && historyQ.data.length === 0 ? (
-            <Card>
-              <CardContent className="py-6 text-sm font-medium text-slate-600">
-                {t.history.empty}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className={cn(isMobileFlow ? 'flex gap-3 overflow-x-auto pb-1' : 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3')}>
-              {buildRecentRideCards(historyQ.data ?? []).map((r) => {
-                const driver = r.driverId ? driverById.get(r.driverId) : undefined
-                const vehicle = r.vehicleId ? vehicleById.get(r.vehicleId) : undefined
-                const statusMeta = getRideStatusMeta(r.status)
-                const hasDriverOrCar = !!driver || !!vehicle
-                return (
-                <div
-                  key={r.id}
-                  className={cn(
-                    'rounded-[18px] transition-[transform,box-shadow] duration-150 ease-out hover:-translate-y-[1px] hover:shadow-card-hover',
-                    isMobileFlow ? 'w-[82vw] shrink-0' : 'block'
-                  )}
-                >
-                <Card className="rounded-[18px] border-slate-200/90">
-                  <CardContent className="space-y-2 p-4 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-semibold text-brand-navy">
-                        {r.pickup.label} {'\u2192'} {r.destination.label}
-                      </p>
-                      <span
-                        className={cn(
-                          'rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide',
-                          statusMeta.toneClass
-                        )}
-                      >
-                        {statusMeta.label}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-brand-navy tabular-nums">
-                        {(r.finalPrice ?? r.estimatedPrice).toFixed(2)} {t.order.bam}
-                      </p>
-                      <p className="text-[12px] font-medium text-slate-600">{formatRideDateTime(r.createdAt)}</p>
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      {hasDriverOrCar ? (
-                        <p className="truncate text-[11px] font-medium text-slate-500">
-                          {driver ? `${driver.firstName} ${driver.lastName}` : ''}
-                          {driver && vehicle ? ' · ' : ''}
-                          {vehicle ? `${vehicle.brand} ${vehicle.model}` : ''}
-                        </p>
-                      ) : (
-                        <p className="text-[11px] font-medium text-slate-400">{t.order.notAvailable}</p>
-                      )}
-                    </div>
-                    {isMobileFlow ? (
-                      <div className="flex gap-2 pt-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            setPickup(r.pickup)
-                            setDestination(r.destination)
-                            push(t.history.repeat, 'success')
-                          }}
-                        >
-                          {t.history.repeat}
-                        </Button>
-                        <Button asChild variant="secondary" size="sm" className="flex-1">
-                          <Link to={`/app/history/${r.id}`}>{t.history.details}</Link>
-                        </Button>
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
+              <div className="absolute inset-x-0 top-0 z-[10] border-b border-black/[0.08] bg-white/95 px-4 py-3 backdrop-blur-md">
+                <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
+                  <h3 className="text-sm font-extrabold tracking-tight text-brand-navy">{t.order.mapFullscreenTitle}</h3>
+                  <button
+                    type="button"
+                    onClick={closeMobileMapPicker}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.1] bg-white text-slate-700 active:scale-[0.98]"
+                    aria-label={t.common.close}
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </button>
                 </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
-      )}
-      <section className="mt-5 space-y-2.5">
-        <h2 className="text-lg font-semibold tracking-tight text-brand-navy">{t.order.scheduleRide}</h2>
-        <p className="text-sm text-slate-700">{t.order.scheduledManageDesc}</p>
-        <div className="flex justify-end">
-          <Link
-            to="/app/scheduled"
-            className="text-sm font-semibold text-brand-teal transition-colors duration-150 hover:text-brand-navy hover:underline"
-          >
-            {t.nav.scheduled}
-          </Link>
-        </div>
-        {scheduledQ.isLoading ? (
-          <p className="text-sm text-slate-500">{t.common.loading}</p>
-        ) : (scheduledQ.data?.length ?? 0) === 0 ? (
-          <Card>
-            <CardContent className="py-4 text-sm text-slate-600">{t.order.scheduledEmpty}</CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {(scheduledQ.data ?? []).slice(0, 2).map((request) => (
-              <Card key={request.id} className="rounded-[18px] border-slate-200/90">
-                <CardContent className="space-y-2 p-4 text-sm">
-                  <p className="font-semibold text-brand-navy">
-                    {request.pickup.label} {'\u2192'} {request.destination.label}
+              </div>
+
+              {showMobileMapHint ? (
+                <div className="pointer-events-none absolute inset-x-0 top-16 z-[11] flex justify-center px-4">
+                  <p className="rounded-full border border-white/50 bg-white/90 px-4 py-2 text-center text-xs font-semibold text-slate-700 shadow-md backdrop-blur-md">
+                    {t.order.mapMoveHint}
                   </p>
-                  <p className="text-xs text-slate-500">
-                    {request.scheduledAt
-                      ? new Date(request.scheduledAt).toLocaleString('bs-BA', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          hour12: false,
-                        })
-                      : t.order.notAvailable}
-                  </p>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-teal">
-                      {request.status}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outlineThin"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={async () => {
-                        await cancelRideRequest(request.id, me.account.id)
-                        await qc.invalidateQueries({ queryKey: ['scheduledRequests', me.profile.id] })
-                        push(t.notifications.rideCancelled, 'success')
-                      }}
-                    >
-                      {t.ride.cancel}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </section>
+                </div>
+              ) : null}
+
+              <Suspense fallback={<MapChunkFallback className="h-full min-h-[50dvh] rounded-none border-0 bg-slate-200/80" />}>
+                <RouteMap
+                  pickup={pickup}
+                  destination={destination}
+                  routePoints={route?.routePoints ?? []}
+                  className="h-full"
+                  mapPickTarget={routeMapPickTarget}
+                  onMapPick={handleMapPick}
+                  onUserMapInteraction={() => {
+                    setMapOverlayDismissed(true)
+                    setShowMobileMapHint(false)
+                  }}
+                  interactionMode="centerPin"
+                  setCenterLocationLabel={t.order.setCenterLocation}
+                  allowTouchInteraction
+                  fullscreen
+                />
+              </Suspense>
+
+              {mapPickTarget === 'pickup' ? (
+                <div className="pointer-events-none absolute inset-x-0 bottom-24 z-[12] flex justify-center px-4">
+                  <button
+                    type="button"
+                    disabled={geoLoading}
+                    onClick={requestCurrentLocationForPickup}
+                    className="pointer-events-auto inline-flex items-center justify-center rounded-full border border-black/[0.1] bg-white/95 px-4 py-2 text-xs font-bold text-brand-navy shadow-lg active:scale-[0.98] disabled:opacity-60"
+                  >
+                    {geoLoading ? t.common.loading : t.order.useCurrentLocation}
+                  </button>
+                </div>
+              ) : null}
+            </motion.div>,
+            document.body
+          )
+        : null}
+
+      {!isMobileFlow ? renderRecentRidesSection() : null}
+      {!isMobileFlow ? renderScheduledSection() : null}
 
       <MapLocationOnboarding
         open={mapGuideActive}
@@ -1277,6 +1397,7 @@ export function OrderPage() {
         onStepChange={setMapGuideStep}
         onComplete={completeMapGuide}
       />
+      </div>
     </PageContainer>
   )
 }

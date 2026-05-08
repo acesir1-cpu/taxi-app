@@ -6,10 +6,11 @@ import { demoGlassDividerClass, demoGlassPanelClass } from '../lib/demoGlassPane
 import { cn } from '../lib/utils'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
-import type { RideStatus } from '../types/domain'
+import type { Driver, Ride, RideStatus, Vehicle } from '../types/domain'
 import { generateDriverStartNearPickup } from '../utils/driverSim'
+import { buildDriverAnimationPath } from '../utils/driverRouteAnimation'
 import { distanceAlongPolylineKm, haversineKm } from '../utils/distance'
-import { interpolateRoute } from '../utils/route'
+import { interpolateRoute, pointAlongPolyline } from '../utils/route'
 import { fetchRoadRoute } from '../services/routingApi'
 import {
   cancelRide,
@@ -33,6 +34,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 
+function useIsMobileRideLayout() {
+  const [mobile, setMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+  )
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)')
+    const on = () => setMobile(mq.matches)
+    on()
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return mobile
+}
+
 export function RidePage() {
   const t = strings()
   const { id } = useParams()
@@ -40,6 +55,7 @@ export function RidePage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
+  const isMobileRide = useIsMobileRideLayout()
   const simSpeed = useDriverSimStore((s) => s.simSpeed)
   const setSimSpeed = useDriverSimStore((s) => s.setSimSpeed)
   const [cancelOpen, setCancelOpen] = useState(false)
@@ -51,6 +67,10 @@ export function RidePage() {
   const [driverPosSim, setDriverPosSim] = useState<{ lat: number; lng: number } | null>(null)
   const [driverOriginState, setDriverOriginState] = useState<{ lat: number; lng: number } | null>(null)
   const [driverStartDistanceKm, setDriverStartDistanceKm] = useState<number | null>(null)
+  /** Full road approach path while driving to pickup (map preview line matches sim polyline). */
+  const [driverApproachPolyline, setDriverApproachPolyline] = useState<Array<{ lat: number; lng: number }> | null>(
+    null
+  )
   const rideMarkerRef = useRef<string | null>(null)
   const driverOriginRef = useRef<{ lat: number; lng: number } | null>(null)
   const animationFrameIdRef = useRef<number | null>(null)
@@ -101,6 +121,15 @@ export function RidePage() {
       lng: ride.driverLng ?? ride.pickup.lng,
     }
   }, [driverPosSim, ride])
+
+  const driverPosRef = useRef(driverPos)
+  driverPosRef.current = driverPos
+
+  useEffect(() => {
+    if (status !== 'vozac_na_putu') {
+      setDriverApproachPolyline(null)
+    }
+  }, [status])
 
   useEffect(() => {
     if (!rideId || !ride) return
@@ -177,8 +206,7 @@ export function RidePage() {
     const baseDuration = Math.max(8_000, Math.min(180_000, Math.round(measuredKm * 6_000)))
     let progress = 0
     let lastTs = 0
-    const totalSegments = routeCoordinates.length - 1
-    const step = async (now: number) => {
+    const step = (now: number) => {
       if (cancelled) return
       if (!lastTs) {
         lastTs = now
@@ -187,20 +215,14 @@ export function RidePage() {
       lastTs = now
       const progressDelta = (delta / baseDuration) * speedRef.current
       progress = Math.min(1, progress + progressDelta)
-      const scaled = progress * totalSegments
-      const segIdx = Math.min(totalSegments - 1, Math.floor(scaled))
-      const segT = scaled - segIdx
-      const a = routeCoordinates[segIdx]!
-      const b = routeCoordinates[segIdx + 1]!
-      const lat = a.lat + (b.lat - a.lat) * segT
-      const lng = a.lng + (b.lng - a.lng) * segT
-      setDriverPosSim({ lat, lng })
+      const p = pointAlongPolyline(routeCoordinates, progress)
+      setDriverPosSim({ lat: p.lat, lng: p.lng })
       if (now - persistStamp >= 450 && rideId) {
         persistStamp = now
-        void updateDriverSimPosition(rideId, lat, lng)
+        void updateDriverSimPosition(rideId, p.lat, p.lng)
       }
       if (progress >= 1) {
-        if (rideId) void updateDriverSimPosition(rideId, lat, lng)
+        if (rideId) void updateDriverSimPosition(rideId, p.lat, p.lng)
         animationFrameIdRef.current = null
         onDone()
         return
@@ -284,12 +306,12 @@ export function RidePage() {
         driverOriginRef.current ??
         (r.driverLat != null && r.driverLng != null ? { lat: r.driverLat, lng: r.driverLng } : { lat: r.pickup.lat, lng: r.pickup.lng })
       const road = await fetchRoadRoute(start, r.pickup)
-      const approach =
+      const approachRaw =
         road.routePoints.length > 1 ? road.routePoints : interpolateRoute(start, r.pickup, 64)
-      const approachKm =
-        road.distanceKm > 0 ? road.distanceKm : haversineKm(start, r.pickup)
+      const approach = buildDriverAnimationPath(approachRaw, start, r.pickup, 64)
       if (cancelled || simRunIdRef.current !== runId) return
       if (rideRef.current?.status !== 'vozac_na_putu') return
+      setDriverApproachPolyline(approach)
       animCancelRef.current = animateMarkerAlongRoute(
         approach,
         () => {
@@ -297,6 +319,7 @@ export function RidePage() {
             if (simRunIdRef.current !== runId) return
             const cur = rideRef.current
             if (!cur || cur.status !== 'vozac_na_putu') return
+            setDriverApproachPolyline(null)
             setDriverPosSim({ lat: cur.pickup.lat, lng: cur.pickup.lng })
             await updateDriverSimPosition(rideId, cur.pickup.lat, cur.pickup.lng)
             const ok = await setRideStatusSafe('stigao')
@@ -306,12 +329,13 @@ export function RidePage() {
             }
           })()
         },
-        approachKm,
+        undefined,
       )
     })()
 
     return () => {
       cancelled = true
+      setDriverApproachPolyline(null)
       cancelActiveAnimation()
     }
   }, [animateMarkerAlongRoute, rideId, setRideStatusSafe, status])
@@ -327,7 +351,9 @@ export function RidePage() {
     const runId = ++simRunIdRef.current
     simStatusRef.current = 'ride_in_progress'
     cancelActiveAnimation()
-    const path = r.routePoints.length > 1 ? r.routePoints : interpolateRoute(r.pickup, r.destination, 72)
+    const pathRaw = r.routePoints.length > 1 ? r.routePoints : interpolateRoute(r.pickup, r.destination, 72)
+    const from = driverPosRef.current
+    const path = buildDriverAnimationPath(pathRaw, from, r.destination, 72)
     animCancelRef.current = animateMarkerAlongRoute(
       path,
       () => {
@@ -341,9 +367,9 @@ export function RidePage() {
           if (ok) simStatusRef.current = 'completed'
         })()
       },
-      r.distanceKm > 0 ? r.distanceKm : undefined,
+      undefined,
     )
-    const measuredKm = r.distanceKm > 0 ? r.distanceKm : distanceAlongPolylineKm(path)
+    const measuredKm = distanceAlongPolylineKm(path)
     const baseDuration = Math.max(8_000, Math.min(180_000, Math.round(measuredKm * 6_000)))
     const fallbackMs = Math.max(3_000, Math.round((baseDuration / Math.max(0.25, simSpeed)) * 1.25))
     const fallbackId = window.setTimeout(() => {
@@ -408,152 +434,57 @@ export function RidePage() {
   const driver = driverQuery.data
   const vehicle = vehicleQuery.data
 
-  return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4 pb-[8.5rem] md:pb-0">
-      <RideStatusBadge status={ride.status} />
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.ride.track}</p>
-          <Button
-            size="sm"
-            variant={followTaxi ? 'secondary' : 'outline'}
-            type="button"
-            onClick={() => setFollowTaxi((v) => !v)}
-          >
-            {followTaxi ? t.ride.followTaxiOn : t.ride.followTaxiOff}
-          </Button>
-        </div>
-        {driverStartDistanceKm != null ? (
-          <p className="text-xs font-medium text-slate-600">
-            {t.ride.distanceToYou} ~{driverStartDistanceKm.toFixed(1)} {t.ride.kmUnit}
-          </p>
-        ) : null}
-        <Suspense fallback={<MapChunkFallback className="min-h-72 sm:min-h-96" />}>
-          <ActiveRideMap
-            ride={ride}
-            driverPos={driverPos}
-            driverOrigin={driverOriginState}
-            followDriver={followTaxi}
-            showArrivalPopup={showArrivalPopup}
-            arrivalPopupText={t.ride.driverArrived}
-          />
-        </Suspense>
-      </div>
+  const etaMinutesDisplay =
+    ride.status === 'vozac_na_putu'
+      ? `~${Math.max(1, Math.ceil(distPickup * 2))} ${t.order.min}`
+      : ride.status === 'u_toku'
+        ? `~${ride.estimatedDurationMin} ${t.order.min}`
+        : '—'
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-base">{t.ride.etaLabel}</CardTitle>
-          <span className="text-sm font-semibold text-brand-teal">
-            {ride.status === 'vozac_na_putu'
-              ? `~${Math.max(1, Math.ceil(distPickup * 2))} ${t.order.min}`
-              : ride.status === 'u_toku'
-                ? `~${ride.estimatedDurationMin} ${t.order.min}`
-                : '—'}
-          </span>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm text-slate-600">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.driver.rideRoute}</p>
-            <p className="font-medium text-brand-navy">
-              {ride.pickup.label} → {ride.destination.label}
-            </p>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <p>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.order.distance}</span>
-              <br />
-              <span className="font-medium text-brand-navy">{ride.distanceKm.toFixed(1)} {t.order.km}</span>
-            </p>
-            <p>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.order.eta}</span>
-              <br />
-              <span className="font-medium text-brand-navy">{ride.estimatedDurationMin} {t.order.min}</span>
-            </p>
-            <p>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.order.estimate}</span>
-              <br />
-              <span className="font-medium text-brand-navy">{ride.estimatedPrice.toFixed(2)} {t.order.bam}</span>
-            </p>
-            <p>
-              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.order.payment}</span>
-              <br />
-              <span className="font-medium text-brand-navy">{ride.paymentMethod}</span>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+  const rideOverlayTopStyle = {
+    top: 'calc(env(safe-area-inset-top, 0px) + 8px)',
+    left: '16px',
+    right: 'calc(16px + 44px + 8px)',
+  } as const
 
-      <Timeline status={ride.status} statusLabels={t.ride.status} />
+  const rideSheetPaddingBottom =
+    'calc(env(safe-area-inset-bottom, 0px) + var(--mobile-nav-height, 5.25rem) + 10px)'
 
-      {driver && vehicle ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">{t.ride.driverVehicleTitle}</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <div className="flex items-center gap-3">
-              {driver.avatarUrl ? (
-                <img
-                  src={driver.avatarUrl}
-                  alt={`${driver.firstName} ${driver.lastName}`}
-                  className="h-12 w-12 shrink-0 rounded-full border border-slate-200 object-cover"
-                />
-              ) : (
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-navy text-sm font-extrabold text-white">
-                  {driverInitials(driver.firstName, driver.lastName)}
-                </div>
-              )}
-              <div className="min-w-0 space-y-1">
-                <p className="truncate font-semibold text-brand-navy">
-                  {driver.firstName} {driver.lastName} · ⭐ {driver.rating.toFixed(1)}
-                </p>
-                <p className="truncate text-slate-600">
-                  {vehicle.brand} {vehicle.model} · {vehicle.registration}
-                </p>
-                <p className="text-slate-500">
-                  {t.ride.distanceToYou} ~
-                  {distPickup < 0.1
-                    ? (distPickup * 1000).toFixed(0) + ' ' + t.ride.metersUnit
-                    : distPickup.toFixed(2) + ' ' + t.ride.kmUnit}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <div className="ride-mobile-action-dock flex flex-col gap-2 sm:flex-row">
-        {ride.status === 'stigao' ? (
-          <Button
-            className="ride-confirm-btn flex-1"
-            size="lg"
-            onClick={() => confirmMut.mutate()}
-            disabled={confirmMut.isPending}
-          >
-            {t.ride.confirmEntry}
-          </Button>
-        ) : null}
-        {['dodijeljena', 'vozac_na_putu', 'stigao'].includes(ride.status) ? (
-          <Button
-            variant="secondary"
-            className="ride-cancel-btn flex-1 border-red-400/80 text-red-700 hover:bg-red-50 hover:text-red-800"
-            size="lg"
-            onClick={() => setCancelOpen(true)}
-          >
-            {t.ride.cancel}
-          </Button>
-        ) : null}
+  const rideActionButtons = (
+    <div className="ride-mobile-action-dock ride-mobile-action-dock--inline flex flex-col gap-2 sm:flex-row">
+      {ride.status === 'stigao' ? (
         <Button
-          variant="ghost"
-          className="ride-problem-btn flex-1 border border-white/70 text-slate-600 hover:bg-transparent hover:text-slate-800"
+          className="ride-confirm-btn flex-1"
           size="lg"
-          onClick={() => navigate(`/app/problem/${ride.id}`)}
+          onClick={() => confirmMut.mutate()}
+          disabled={confirmMut.isPending}
         >
-          {t.ride.problem}
+          {t.ride.confirmEntry}
         </Button>
-      </div>
+      ) : null}
+      {['dodijeljena', 'vozac_na_putu', 'stigao'].includes(ride.status) ? (
+        <Button
+          variant="secondary"
+          className="ride-cancel-btn flex-1 border-red-400/80 text-red-700 hover:bg-red-50 hover:text-red-800"
+          size="lg"
+          onClick={() => setCancelOpen(true)}
+        >
+          {t.ride.cancel}
+        </Button>
+      ) : null}
+      <Button
+        variant="ghost"
+        className="ride-problem-btn flex-1 border-2 border-white/85 bg-white/10 text-slate-600 shadow-[0_0_0_1px_rgb(255_255_255/0.45),0_2px_10px_rgb(15_23_42/0.06)] backdrop-blur-[2px] hover:bg-white/18 hover:text-slate-800"
+        size="lg"
+        onClick={() => navigate(`/app/problem/${ride.id}`)}
+      >
+        {t.ride.problem}
+      </Button>
+    </div>
+  )
 
-      <motion.div layout className={demoGlassPanelClass}>
+  const demoPanel = (
+    <motion.div layout className={demoGlassPanelClass}>
         <button
           type="button"
           className="flex w-full items-center justify-between gap-2 text-left"
@@ -705,10 +636,138 @@ export function RidePage() {
             </div>
           </div>
         ) : null}
-      </motion.div>
+    </motion.div>
+  )
+
+  return (
+    <>
+      {isMobileRide ? (
+        <>
+          <div className="fixed inset-0 z-[50] lg:hidden">
+            <Suspense fallback={<MapChunkFallback className="h-full w-full border-0 bg-slate-200/80" />}>
+              <ActiveRideMap
+                variant="fullscreen"
+                ride={ride}
+                driverPos={driverPos}
+                driverOrigin={driverOriginState}
+                approachPolyline={driverApproachPolyline}
+                followDriver={followTaxi}
+                showArrivalPopup={showArrivalPopup}
+                arrivalPopupText={t.ride.driverArrived}
+                className="h-full w-full"
+              />
+            </Suspense>
+          </div>
+          <div className="pointer-events-none fixed z-[60] lg:hidden" style={rideOverlayTopStyle}>
+            <div
+              className="pointer-events-auto rounded-2xl border border-black/[0.06] px-4 py-3 shadow-lg backdrop-blur-[12px]"
+              style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <RideStatusBadge status={ride.status} />
+                <Button
+                  size="sm"
+                  variant={followTaxi ? 'secondary' : 'outline'}
+                  type="button"
+                  onClick={() => setFollowTaxi((v) => !v)}
+                >
+                  {followTaxi ? t.ride.followTaxiOn : t.ride.followTaxiOff}
+                </Button>
+              </div>
+              {driverStartDistanceKm != null ? (
+                <p className="mt-2 text-xs font-medium text-slate-600">
+                  {t.ride.distanceToYou} ~{driverStartDistanceKm.toFixed(1)} {t.ride.kmUnit}
+                </p>
+              ) : null}
+            </div>
+          </div>
+          <div
+            className="fixed inset-x-0 bottom-0 z-[70] flex max-h-[60vh] flex-col overflow-hidden rounded-t-2xl border border-slate-200/90 bg-white shadow-[0_-8px_32px_rgba(15,23,42,0.12)] lg:hidden"
+            style={{ paddingBottom: rideSheetPaddingBottom }}
+          >
+            <div className="flex shrink-0 justify-center pt-3 pb-2" aria-hidden>
+              <span className="block h-1 w-[36px] shrink-0 rounded-full bg-[#D1D5DB]" />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden px-4 pt-1">
+                <div className="flex flex-row items-center justify-between gap-2 pb-0.5">
+                  <span className="text-base font-semibold text-brand-navy">{t.ride.etaLabel}</span>
+                  <span className="text-sm font-semibold text-brand-teal">{etaMinutesDisplay}</span>
+                </div>
+                <RideEstimateSection ride={ride} t={t} />
+                <RideProgressStepper status={ride.status} />
+                {driver && vehicle ? (
+                  <RideDriverCard driver={driver} vehicle={vehicle} t={t} distPickup={distPickup} />
+                ) : null}
+                {rideActionButtons}
+                {demoPanel}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {!isMobileRide ? (
+      <div className="mx-auto w-full max-w-[1200px] space-y-4 pb-[8.5rem] md:pb-0">
+        <RideStatusBadge status={ride.status} />
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t.ride.track}</p>
+            <Button
+              size="sm"
+              variant={followTaxi ? 'secondary' : 'outline'}
+              type="button"
+              onClick={() => setFollowTaxi((v) => !v)}
+            >
+              {followTaxi ? t.ride.followTaxiOn : t.ride.followTaxiOff}
+            </Button>
+          </div>
+          {driverStartDistanceKm != null ? (
+            <p className="text-xs font-medium text-slate-600">
+              {t.ride.distanceToYou} ~{driverStartDistanceKm.toFixed(1)} {t.ride.kmUnit}
+            </p>
+          ) : null}
+          <Suspense fallback={<MapChunkFallback className="min-h-72 sm:min-h-96" />}>
+            <ActiveRideMap
+              ride={ride}
+              driverPos={driverPos}
+              driverOrigin={driverOriginState}
+              approachPolyline={driverApproachPolyline}
+              followDriver={followTaxi}
+              showArrivalPopup={showArrivalPopup}
+              arrivalPopupText={t.ride.driverArrived}
+            />
+          </Suspense>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base">{t.ride.etaLabel}</CardTitle>
+            <span className="text-sm font-semibold text-brand-teal">{etaMinutesDisplay}</span>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-slate-600">
+            <RideEstimateSection ride={ride} t={t} />
+          </CardContent>
+        </Card>
+
+        <RideProgressStepper status={ride.status} />
+
+        {driver && vehicle ? (
+          <RideDriverCard driver={driver} vehicle={vehicle} t={t} distPickup={distPickup} />
+        ) : null}
+
+        {rideActionButtons}
+
+        {demoPanel}
+      </div>
+      ) : null}
 
       {cancelOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="presentation" onClick={() => setCancelOpen(false)}>
+        <div
+          className="fixed inset-0 z-[400] flex items-center justify-center bg-black/40 p-4"
+          role="presentation"
+          onClick={() => setCancelOpen(false)}
+        >
           <div
             role="dialog"
             aria-modal="true"
@@ -737,7 +796,7 @@ export function RidePage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -748,25 +807,158 @@ function driverInitials(firstName: string, lastName: string): string {
   return `${first}${first && last ? '.' : ''}${last}`.toUpperCase() || '?'
 }
 
-function Timeline({
-  status,
-  statusLabels,
-}: {
-  status: RideStatus
-  statusLabels: Record<RideStatus, string>
-}) {
-  const steps: RideStatus[] = ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku', 'zavrsena']
-  const idx = steps.indexOf(status)
+const RIDE_PROGRESS_KEYS = ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku', 'zavrsena'] as const
+const RIDE_PROGRESS_LABELS = ['Dodjeljen', 'Na putu', 'Stigao', 'Vožnja', 'Završeno'] as const
+
+function RideProgressStepper({ status }: { status: RideStatus }) {
+  const cancelled = status === 'otkazana' || status === 'neuspjesna'
+  const activeIdx = cancelled
+    ? -1
+    : RIDE_PROGRESS_KEYS.indexOf(status as (typeof RIDE_PROGRESS_KEYS)[number])
+
   return (
-    <ol className="flex flex-wrap gap-2 text-xs font-medium text-slate-600">
-      {steps.map((s, i) => (
-        <li
-          key={s}
-          className={`rounded-full px-3 py-1 ${i <= idx ? 'bg-brand-teal/15 text-brand-navy' : 'bg-slate-100 text-slate-400'}`}
-        >
-          {statusLabels[s]}
-        </li>
-      ))}
-    </ol>
+    <div className="w-full">
+      <div className="flex w-full items-start">
+        {RIDE_PROGRESS_KEYS.map((_, i) => {
+          const completed =
+            (activeIdx >= 0 && i < activeIdx) || (status === 'zavrsena' && i <= 4)
+          const active = activeIdx >= 0 && i === activeIdx && status !== 'zavrsena' && !cancelled
+          const leftLineDone = i >= 1 && (activeIdx >= i || status === 'zavrsena')
+          const rightLineDone = i < RIDE_PROGRESS_KEYS.length - 1 && (activeIdx > i || status === 'zavrsena')
+
+          return (
+            <div key={RIDE_PROGRESS_KEYS[i]} className="flex min-w-0 flex-1 flex-col items-stretch">
+              <div className="flex h-4 w-full items-center">
+                <div
+                  className={cn(
+                    'h-0.5 flex-1 rounded-full',
+                    i === 0 ? 'opacity-0' : leftLineDone ? 'bg-[#F5A623]' : 'bg-[#D1D5DB]'
+                  )}
+                  aria-hidden
+                />
+                <div
+                  className={cn(
+                    'relative z-[1] h-2.5 w-2.5 shrink-0 rounded-full',
+                    active
+                      ? 'bg-[#F5A623] shadow-[0_0_0_3px_rgba(245,166,35,0.25)]'
+                      : completed
+                        ? 'bg-[#F5A623]'
+                        : 'border-2 border-[#D1D5DB] bg-white'
+                  )}
+                />
+                <div
+                  className={cn(
+                    'h-0.5 flex-1 rounded-full',
+                    i === RIDE_PROGRESS_KEYS.length - 1 ? 'opacity-0' : rightLineDone ? 'bg-[#F5A623]' : 'bg-[#D1D5DB]'
+                  )}
+                  aria-hidden
+                />
+              </div>
+              <p
+                className={cn(
+                  'mt-1 px-0.5 text-center text-[9px] font-medium leading-tight text-[#6B7280] line-clamp-2',
+                  active && 'font-bold text-[#111827]',
+                  completed && !active && 'text-[#374151]'
+                )}
+              >
+                {RIDE_PROGRESS_LABELS[i]}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RideEstimateSection({
+  ride,
+  t,
+}: {
+  ride: Ride
+  t: ReturnType<typeof strings>
+}) {
+  return (
+    <>
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-[#9CA3AF]">{t.driver.rideRoute}</p>
+        <p className="text-[15px] font-semibold leading-snug text-[#111827]">
+          {ride.pickup.label} → {ride.destination.label}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{t.order.distance}</p>
+          <p className="text-[15px] font-semibold text-[#111827]">
+            {ride.distanceKm.toFixed(1)} {t.order.km}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{t.order.eta}</p>
+          <p className="text-[15px] font-semibold text-[#111827]">
+            {ride.estimatedDurationMin} {t.order.min}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{t.order.estimate}</p>
+          <p className="text-[15px] font-semibold text-[#111827]">
+            {ride.estimatedPrice.toFixed(2)} {t.order.bam}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-[#9CA3AF]">{t.order.payment}</p>
+          <p className="text-[15px] font-semibold text-[#111827]">{ride.paymentMethod}</p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function RideDriverCard({
+  driver,
+  vehicle,
+  t,
+  distPickup,
+}: {
+  driver: Driver
+  vehicle: Vehicle
+  t: ReturnType<typeof strings>
+  distPickup: number
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{t.ride.driverVehicleTitle}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-sm">
+        <div className="flex items-center gap-3">
+          {driver.avatarUrl ? (
+            <img
+              src={driver.avatarUrl}
+              alt={`${driver.firstName} ${driver.lastName}`}
+              className="h-12 w-12 shrink-0 rounded-full border border-slate-200 object-cover"
+            />
+          ) : (
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-navy text-sm font-extrabold text-white">
+              {driverInitials(driver.firstName, driver.lastName)}
+            </div>
+          )}
+          <div className="min-w-0 space-y-1">
+            <p className="truncate font-semibold text-brand-navy">
+              {driver.firstName} {driver.lastName} · ⭐ {driver.rating.toFixed(1)}
+            </p>
+            <p className="truncate text-slate-600">
+              {vehicle.brand} {vehicle.model} · {vehicle.registration}
+            </p>
+            <p className="text-slate-500">
+              {t.ride.distanceToYou} ~
+              {distPickup < 0.1
+                ? (distPickup * 1000).toFixed(0) + ' ' + t.ride.metersUnit
+                : distPickup.toFixed(2) + ' ' + t.ride.kmUnit}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

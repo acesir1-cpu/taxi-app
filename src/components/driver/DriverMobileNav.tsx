@@ -7,8 +7,12 @@ import { strings } from '../../i18n/strings'
 import { cn } from '../../lib/utils'
 import {
   MobileNavOverflowMenu,
-  mobileNavOverflowMenuDangerClassName,
-  mobileNavOverflowMenuLinkClassName,
+  mobileNavOverflowSheetDangerIconClass,
+  mobileNavOverflowSheetDangerRow,
+  mobileNavOverflowSheetIconClass,
+  mobileNavOverflowSheetRowBase,
+  mobileNavOverflowSheetRowDivider,
+  mobileNavOverflowSheetRowDividerDanger,
   mobileTabBarItemClass,
   mobileTabBarNavLinkClass,
   mobileTabBarNavShellClassName,
@@ -40,29 +44,29 @@ export function DriverMobileNav() {
       <MobileNavOverflowMenu open={settingsMenuOpen} onClose={() => setSettingsMenuOpen(false)}>
         <Link
           to="/driver/settings#profile-account"
-          className={mobileNavOverflowMenuLinkClassName}
+          className={cn(mobileNavOverflowSheetRowBase, mobileNavOverflowSheetRowDivider)}
           onClick={() => setSettingsMenuOpen(false)}
         >
-          <User className="h-4 w-4" />
+          <User className={mobileNavOverflowSheetIconClass} aria-hidden />
           {t.nav.profileAccount}
         </Link>
         <Link
           to="/driver/settings"
-          className={mobileNavOverflowMenuLinkClassName}
+          className={cn(mobileNavOverflowSheetRowBase, mobileNavOverflowSheetRowDividerDanger)}
           onClick={() => setSettingsMenuOpen(false)}
         >
-          <Settings className="h-4 w-4" />
+          <Settings className={mobileNavOverflowSheetIconClass} aria-hidden />
           {t.nav.profile}
         </Link>
         <button
           type="button"
-          className={mobileNavOverflowMenuDangerClassName}
+          className={mobileNavOverflowSheetDangerRow}
           onClick={() => {
             setSettingsMenuOpen(false)
             void onLogout()
           }}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className={mobileNavOverflowSheetDangerIconClass} aria-hidden />
           {t.auth.logout}
         </button>
       </MobileNavOverflowMenu>

@@ -219,7 +219,7 @@ export default function RouteMap({
         {driverPosition ? (
           <Marker position={[driverPosition.lat, driverPosition.lng]} icon={driverIcon} />
         ) : null}
-        <FitBounds points={fitPoints} />
+        {!centerPinPick ? <FitBounds points={fitPoints} /> : null}
       </MapContainer>
     </div>
   )

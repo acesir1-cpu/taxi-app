@@ -105,6 +105,7 @@ export const en = {
   order: {
     pickup: 'Pickup',
     destination: 'Drop-off',
+    swapPickupDestination: 'Swap pickup and drop-off',
     mapPick: 'Pick on map',
     mapPickPickup: 'Pickup — tap map',
     mapPickDestination: 'Drop-off — tap map',
@@ -182,7 +183,7 @@ export const en = {
     notAvailable: 'Not available',
     waitingRouteSelection: 'Waiting for route selection...',
     greetingQuestion: 'Where are you going today?',
-    quickTo: 'Quick to:',
+    quickTo: 'quick to:',
     weatherBonus: 'Bonus',
     weatherSummary: 'Cloudy · Sarajevo',
     userClockLabel: 'User time',
@@ -467,6 +468,9 @@ export const en = {
   },
   notifications: {
     bell: 'Notifications',
+    sectionToday: 'Today',
+    sectionYesterday: 'Yesterday',
+    sectionEarlier: 'Earlier',
     markAllRead: 'Mark all read',
     deleteAll: 'Delete all',
     deleteAllConfirm: 'Are you sure you want to delete all notifications?',

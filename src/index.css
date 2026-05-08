@@ -138,8 +138,8 @@
       ),
       url('/app-shell-bg.png');
     background-repeat: no-repeat, no-repeat;
-    background-size: cover, 185% auto;
-    background-position: center, 52% 24%;
+    background-size: cover, cover;
+    background-position: center, center;
   }
 }
 
@@ -154,6 +154,13 @@
   html,
   body {
     min-height: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
   }
 
   body {
@@ -171,8 +178,12 @@
   }
 
   .app-shell-atmosphere::before {
-    background-size: cover, 225% auto;
-    background-position: center, 24% 24%;
+    /* Fill viewport on tall narrow screens (width% + auto height left gaps). */
+    background-size: cover, cover;
+    background-position: center, center;
+    min-height: 100vh;
+    min-height: 100dvh;
+    min-height: -webkit-fill-available;
   }
 
   .app-shell-atmosphere main {
@@ -266,6 +277,18 @@
     box-shadow: 0 -0.25rem 1.2rem rgb(15 23 42 / 0.12);
   }
 
+  /* In bottom sheet / page flow — not a floating dock above the nav */
+  .ride-mobile-action-dock.ride-mobile-action-dock--inline {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+
   .ride-mobile-action-dock .inline-flex,
   .ride-mobile-action-dock button {
     min-height: clamp(2.9rem, 12vw, 3.3rem);
@@ -288,6 +311,17 @@
     display: none;
   }
 
+  .overflow-y-auto,
+  [class*='overflow-y-auto'] {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar,
+  [class*='overflow-y-auto']::-webkit-scrollbar {
+    display: none;
+  }
+
   .leaflet-container {
     min-height: clamp(16rem, 44vh, 23rem);
   }
@@ -295,6 +329,11 @@
   .active-ride-map-canvas {
     height: clamp(20rem, 45vh, 30rem) !important;
     min-height: 45vh;
+  }
+
+  .leaflet-container.active-ride-map-fullscreen {
+    height: 100% !important;
+    min-height: 0 !important;
   }
 
   .ride-mobile-action-dock .ride-confirm-btn {
@@ -314,9 +353,11 @@
 
   .ride-mobile-action-dock .ride-problem-btn {
     order: 3;
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
+    background: rgb(255 255 255 / 0.12) !important;
+    border: 1.5px solid rgb(255 255 255 / 0.88) !important;
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.45),
+      0 2px 10px rgb(15 23 42 / 0.06) !important;
     color: rgb(71 85 105) !important;
     font-weight: 600;
     min-height: 2.5rem;

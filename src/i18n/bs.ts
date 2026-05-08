@@ -104,6 +104,7 @@ export const bs = {
   order: {
     pickup: 'Polazište',
     destination: 'Odredište',
+    swapPickupDestination: 'Zamijeni polazište i odredište',
     mapPick: 'Odaberi na mapi',
     mapPickPickup: 'Polazište — klik na kartu',
     mapPickDestination: 'Odredište — klik na kartu',
@@ -182,7 +183,7 @@ export const bs = {
     notAvailable: 'Nije dostupno',
     waitingRouteSelection: 'Čekamo odabir rute...',
     greetingQuestion: 'Gdje idete danas?',
-    quickTo: 'Brzo do:',
+    quickTo: 'brzo do:',
     weatherBonus: 'Bonus',
     weatherSummary: 'Oblačno · Sarajevo',
     userClockLabel: 'Vrijeme korisnika',
@@ -467,6 +468,9 @@ export const bs = {
   },
   notifications: {
     bell: 'Obavještenja',
+    sectionToday: 'Danas',
+    sectionYesterday: 'Juče',
+    sectionEarlier: 'Ranije',
     markAllRead: 'Pročitaj sve',
     deleteAll: 'Obriši sve',
     deleteAllConfirm: 'Da li ste sigurni da želite obrisati sva obavještenja?',

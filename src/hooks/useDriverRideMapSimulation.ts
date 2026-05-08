@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { DriverActiveRide } from '../types/domain'
 import { driverCompleteRide, driverPatchActiveRidePosition } from '../services/driverSessionApi'
+import { buildDriverAnimationPath } from '../utils/driverRouteAnimation'
 import { fetchRoadRoute } from '../services/routingApi'
 import { distanceAlongPolylineKm, haversineKm } from '../utils/distance'
 import { generateDriverStartNearPickup } from '../utils/driverSim'
-import { interpolateRoute } from '../utils/route'
+import { interpolateRoute, pointAlongPolyline } from '../utils/route'
 
 /**
  * Map a polyline length to an animation duration so short rides feel snappy
@@ -106,7 +107,6 @@ export function useDriverRideMapSimulation(
       const baseDuration = durationForRouteKm(measuredKm)
       let progress = 0
       let lastTs = 0
-      const totalSegments = routeCoordinates.length - 1
       const step = (now: number) => {
         if (cancelled) return
         if (!lastTs) lastTs = now
@@ -114,20 +114,14 @@ export function useDriverRideMapSimulation(
         lastTs = now
         const progressDelta = (delta / baseDuration) * speedRef.current
         progress = Math.min(1, progress + progressDelta)
-        const scaled = progress * totalSegments
-        const segIdx = Math.min(totalSegments - 1, Math.floor(scaled))
-        const segT = scaled - segIdx
-        const a = routeCoordinates[segIdx]!
-        const b = routeCoordinates[segIdx + 1]!
-        const lat = a.lat + (b.lat - a.lat) * segT
-        const lng = a.lng + (b.lng - a.lng) * segT
-        commitPos({ lat, lng })
+        const p = pointAlongPolyline(routeCoordinates, progress)
+        commitPos({ lat: p.lat, lng: p.lng })
         if (now - persistStamp >= 450) {
           persistStamp = now
-          void driverPatchActiveRidePosition(accountIdBound, lat, lng)
+          void driverPatchActiveRidePosition(accountIdBound, p.lat, p.lng)
         }
         if (progress >= 1) {
-          void driverPatchActiveRidePosition(accountIdBound, lat, lng)
+          void driverPatchActiveRidePosition(accountIdBound, p.lat, p.lng)
           animationFrameIdRef.current = null
           onDone()
           return
@@ -156,10 +150,9 @@ export function useDriverRideMapSimulation(
       void (async () => {
         const start = displayPosRef.current ?? { lat: r.pickup.lat, lng: r.pickup.lng }
         const road = await fetchRoadRoute(start, r.pickup)
-        const approach =
+        const approachRaw =
           road.routePoints.length > 1 ? road.routePoints : interpolateRoute(start, r.pickup, 64)
-        const approachKm =
-          road.distanceKm > 0 ? road.distanceKm : haversineKm(start, r.pickup)
+        const approach = buildDriverAnimationPath(approachRaw, start, r.pickup, 64)
         if (cancelled) return
         const still = rideRef.current
         if (
@@ -176,7 +169,7 @@ export function useDriverRideMapSimulation(
             commitPos(p)
             void driverPatchActiveRidePosition(accountIdBound, p.lat, p.lng)
           },
-          approachKm,
+          undefined,
         )
       })()
       return () => {
@@ -186,13 +179,13 @@ export function useDriverRideMapSimulation(
     }
 
     if (r.flowStatus === 'u_toku') {
-      const path = r.routePoints.length > 1 ? r.routePoints : interpolateRoute(r.pickup, r.destination, 72)
+      const pathRaw = r.routePoints.length > 1 ? r.routePoints : interpolateRoute(r.pickup, r.destination, 72)
+      const from = displayPosRef.current ?? { lat: r.pickup.lat, lng: r.pickup.lng }
+      const path = buildDriverAnimationPath(pathRaw, from, r.destination, 72)
       const fallbackMs = Math.max(
         3000,
         Math.round(
-          (durationForRouteKm(r.routeDistanceKm > 0 ? r.routeDistanceKm : distanceAlongPolylineKm(path)) /
-            Math.max(0.25, speedRef.current)) *
-            1.25
+          (durationForRouteKm(distanceAlongPolylineKm(path)) / Math.max(0.25, speedRef.current)) * 1.25
         )
       )
       let finalized = false
@@ -216,11 +209,7 @@ export function useDriverRideMapSimulation(
           finalizeRide()
         }
       }, fallbackMs)
-      animCancelRef.current = animateMarkerAlongRoute(
-        path,
-        finalizeRide,
-        r.routeDistanceKm > 0 ? r.routeDistanceKm : undefined,
-      )
+      animCancelRef.current = animateMarkerAlongRoute(path, finalizeRide, undefined)
       return () => {
         window.clearTimeout(fallbackId)
         cancelActiveAnimation()

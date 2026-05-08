@@ -8,8 +8,12 @@ import { loadPassengerProfileExtras } from '../../lib/passengerSettingsPrefs'
 import { cn } from '../../lib/utils'
 import {
   MobileNavOverflowMenu,
-  mobileNavOverflowMenuDangerClassName,
-  mobileNavOverflowMenuLinkClassName,
+  mobileNavOverflowSheetDangerIconClass,
+  mobileNavOverflowSheetDangerRow,
+  mobileNavOverflowSheetIconClass,
+  mobileNavOverflowSheetRowBase,
+  mobileNavOverflowSheetRowDivider,
+  mobileNavOverflowSheetRowDividerDanger,
   mobileTabBarItemClass,
   mobileTabBarNavLinkClass,
   mobileTabBarNavShellClassName,
@@ -50,37 +54,37 @@ export function MobileBottomNav({ accountId, name }: { accountId: string; name: 
       <MobileNavOverflowMenu open={profileMenuOpen} onClose={() => setProfileMenuOpen(false)}>
         <Link
           to="/app/history"
-          className={mobileNavOverflowMenuLinkClassName}
+          className={cn(mobileNavOverflowSheetRowBase, mobileNavOverflowSheetRowDivider)}
           onClick={() => setProfileMenuOpen(false)}
         >
-          <History className="h-4 w-4" />
+          <History className={mobileNavOverflowSheetIconClass} aria-hidden />
           {t.nav.history}
         </Link>
         <Link
           to="/app/profile#profile-account"
-          className={mobileNavOverflowMenuLinkClassName}
+          className={cn(mobileNavOverflowSheetRowBase, mobileNavOverflowSheetRowDivider)}
           onClick={() => setProfileMenuOpen(false)}
         >
-          <User className="h-4 w-4" />
+          <User className={mobileNavOverflowSheetIconClass} aria-hidden />
           {t.nav.profileAccount}
         </Link>
         <Link
           to="/app/profile"
-          className={mobileNavOverflowMenuLinkClassName}
+          className={cn(mobileNavOverflowSheetRowBase, mobileNavOverflowSheetRowDividerDanger)}
           onClick={() => setProfileMenuOpen(false)}
         >
-          <Settings className="h-4 w-4" />
+          <Settings className={mobileNavOverflowSheetIconClass} aria-hidden />
           {t.nav.profile}
         </Link>
         <button
           type="button"
-          className={mobileNavOverflowMenuDangerClassName}
+          className={mobileNavOverflowSheetDangerRow}
           onClick={() => {
             setProfileMenuOpen(false)
             void onLogout()
           }}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className={mobileNavOverflowSheetDangerIconClass} aria-hidden />
           {t.auth.logout}
         </button>
       </MobileNavOverflowMenu>
@@ -89,13 +93,13 @@ export function MobileBottomNav({ accountId, name }: { accountId: string; name: 
           <Car className="h-5 w-5" />
           {t.nav.order}
         </NavLink>
-        <NavLink to="/app/scheduled" className={mobileTabBarNavLinkClass}>
-          <CalendarClock className="h-5 w-5" />
-          {t.nav.scheduled}
-        </NavLink>
         <NavLink to="/app/active" className={mobileTabBarNavLinkClass}>
           <Navigation className="h-5 w-5" />
           {t.nav.activeShort}
+        </NavLink>
+        <NavLink to="/app/scheduled" className={mobileTabBarNavLinkClass}>
+          <CalendarClock className="h-5 w-5" />
+          {t.nav.scheduled}
         </NavLink>
         <button
           type="button"

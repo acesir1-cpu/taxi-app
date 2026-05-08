@@ -47,17 +47,7 @@ export function ScheduledRidesPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1200px] space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-indigo-50/60 p-4 sm:p-5">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
-            <CalendarClock className="h-5 w-5" />
-          </span>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-brand-navy">{t.nav.scheduled}</h1>
-            <p className="text-sm text-slate-600">{t.order.scheduledManageDesc}</p>
-          </div>
-        </div>
-      </div>
+      <h1 className="px-4 text-xl font-bold text-brand-navy">{t.nav.scheduled}</h1>
 
       {scheduledQ.isLoading ? (
         <p className="text-sm text-slate-500">{t.common.loading}</p>
