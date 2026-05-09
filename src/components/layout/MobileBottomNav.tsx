@@ -15,7 +15,6 @@ import {
   mobileNavOverflowSheetRowDivider,
   mobileNavOverflowSheetRowDividerDanger,
   mobileTabBarItemClass,
-  mobileTabBarNavLinkClass,
   mobileTabBarNavShellClassName,
 } from './mobileNavPrimitives'
 
@@ -48,6 +47,7 @@ export function MobileBottomNav({ accountId, name }: { accountId: string; name: 
   }
 
   const profileTabActive = profileMenuOpen || location.pathname.startsWith('/app/profile')
+  const navLinkClass = ({ isActive }: { isActive: boolean }) => mobileTabBarItemClass(!profileMenuOpen && isActive)
 
   return (
     <>
@@ -89,22 +89,22 @@ export function MobileBottomNav({ accountId, name }: { accountId: string; name: 
         </button>
       </MobileNavOverflowMenu>
       <nav className={cn('passenger-mobile-nav', mobileTabBarNavShellClassName)} role="navigation">
-        <NavLink to="/app/order" className={mobileTabBarNavLinkClass}>
+        <NavLink to="/app/order" className={navLinkClass}>
           <Car className="h-5 w-5" />
           {t.nav.order}
         </NavLink>
-        <NavLink to="/app/active" className={mobileTabBarNavLinkClass}>
+        <NavLink to="/app/active" className={navLinkClass}>
           <Navigation className="h-5 w-5" />
           {t.nav.activeShort}
         </NavLink>
-        <NavLink to="/app/scheduled" className={mobileTabBarNavLinkClass}>
+        <NavLink to="/app/scheduled" className={navLinkClass}>
           <CalendarClock className="h-5 w-5" />
           {t.nav.scheduled}
         </NavLink>
         <button
           type="button"
           className={mobileTabBarItemClass(profileTabActive)}
-          onClick={() => setProfileMenuOpen(true)}
+          onClick={() => setProfileMenuOpen((open) => !open)}
         >
           {avatarDataUrl ? (
             <img src={avatarDataUrl} alt={name} className="h-5 w-5 rounded-full border border-slate-200 object-cover" />

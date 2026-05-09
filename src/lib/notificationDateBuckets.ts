@@ -1,9 +1,19 @@
-import type { AppNotification } from '../types/domain'
+import type { AppNotification } from '../types/notifications'
 
-export type NotificationDayBucket = 'today' | 'yesterday' | 'older'
+export type NotificationDayBucket = 'today' | 'yesterday' | 'thisWeek' | 'older'
 
-function startOfLocalDay(d: Date): number {
+function startOfLocalDayMs(d: Date): number {
   const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
+  return x.getTime()
+}
+
+/** Monday 00:00 local time for the ISO week containing `d`. */
+function startOfIsoWeekMs(d: Date): number {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const dow = x.getDay()
+  const daysFromMonday = (dow + 6) % 7
+  x.setDate(x.getDate() - daysFromMonday)
   x.setHours(0, 0, 0, 0)
   return x.getTime()
 }
@@ -11,10 +21,12 @@ function startOfLocalDay(d: Date): number {
 export function notificationDayBucket(iso: string): NotificationDayBucket {
   const created = new Date(iso).getTime()
   const now = new Date()
-  const todayStart = startOfLocalDay(now)
+  const todayStart = startOfLocalDayMs(now)
   const yesterdayStart = todayStart - 86400000
   if (created >= todayStart) return 'today'
   if (created >= yesterdayStart) return 'yesterday'
+  const weekStart = startOfIsoWeekMs(now)
+  if (created >= weekStart && created < yesterdayStart) return 'thisWeek'
   return 'older'
 }
 
@@ -24,6 +36,7 @@ export function groupNotificationsByDay(
   const r: Record<NotificationDayBucket, AppNotification[]> = {
     today: [],
     yesterday: [],
+    thisWeek: [],
     older: [],
   }
   for (const n of items) {
@@ -32,13 +45,12 @@ export function groupNotificationsByDay(
   return r
 }
 
-/** Flatten grouped sections with a max total count (newest-first order preserved per bucket). */
 export function takeGroupedNotifications(
   items: AppNotification[],
   maxItems: number
 ): Array<{ bucket: NotificationDayBucket; items: AppNotification[] }> {
   const grouped = groupNotificationsByDay(items)
-  const order: NotificationDayBucket[] = ['today', 'yesterday', 'older']
+  const order: NotificationDayBucket[] = ['today', 'yesterday', 'thisWeek', 'older']
   const out: Array<{ bucket: NotificationDayBucket; items: AppNotification[] }> = []
   let count = 0
   for (const bucket of order) {

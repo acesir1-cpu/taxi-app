@@ -29,6 +29,53 @@ export function estimateDurationMin(distanceKm: number, speedKmh = 30): number {
   return Math.max(1, Math.round((distanceKm / speedKmh) * 60))
 }
 
+/** Closest point on segment AB to P (planar lon/lat; fine for short urban segments). */
+function closestPointOnSegment(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+  p: { lat: number; lng: number }
+): { lat: number; lng: number } {
+  const abx = b.lng - a.lng
+  const aby = b.lat - a.lat
+  const apx = p.lng - a.lng
+  const apy = p.lat - a.lat
+  const ab2 = abx * abx + aby * aby
+  const t = ab2 < 1e-18 ? 0 : Math.max(0, Math.min(1, (apx * abx + apy * aby) / ab2))
+  return { lat: a.lat + t * aby, lng: a.lng + t * abx }
+}
+
+/**
+ * Keep only the sub-path from the driver's position onward (toward the end of `points`),
+ * so a trailing polyline does not stay visible “behind” the vehicle.
+ */
+export function trimPolylineAhead(
+  points: ReadonlyArray<{ lat: number; lng: number }>,
+  from: { lat: number; lng: number }
+): Array<{ lat: number; lng: number }> {
+  if (points.length < 2) return points.length ? [{ ...points[0]! }] : []
+  let bestDist = Infinity
+  let bestI = 0
+  let bestPoint = points[0]!
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]!
+    const b = points[i + 1]!
+    const c = closestPointOnSegment(a, b, from)
+    const d = haversineKm(from, c)
+    if (d < bestDist - 1e-9 || (Math.abs(d - bestDist) <= 1e-9 && i > bestI)) {
+      bestDist = d
+      bestI = i
+      bestPoint = c
+    }
+  }
+  const rest = points.slice(bestI + 1)
+  const out: Array<{ lat: number; lng: number }> = [bestPoint]
+  for (const q of rest) {
+    const prev = out[out.length - 1]!
+    if (haversineKm(prev, q) >= 0.00005) out.push(q)
+  }
+  return out.length >= 2 ? out : [from, points[points.length - 1]!]
+}
+
 export function pointAlongPolyline(
   points: Array<{ lat: number; lng: number }>,
   t: number

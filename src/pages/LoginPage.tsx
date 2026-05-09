@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import * as React from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
@@ -11,25 +12,40 @@ import {
   DEMO_PASSENGER_PASSWORD,
 } from '../data/seed'
 import { strings } from '../i18n/strings'
+import { useLangRefresh } from '../hooks/useLangRefresh'
 import { buildLoginSchema, type LoginFormValues } from '../schemas/auth'
-import { driverDemoLogin, googleLogin, login } from '../services/authApi'
+import { googleLogin, login } from '../services/authApi'
 import { useToastStore } from '../store/notificationStore'
-import { AuthCard } from '../components/auth/AuthCard'
-import { AuthScreenLayout } from '../components/auth/AuthScreenLayout'
 import { GoogleGIcon } from '../components/icons/GoogleGIcon'
-import { Button } from '../components/ui/button'
-import { Input } from '../components/ui/input'
+import { cn } from '../lib/utils'
+import { AuthInput, PrimaryButton, SecondaryButton, RoleToggle, Field, Divider } from '../components/auth/authPrimitives'
+
+type AuthMode = 'passenger' | 'driver'
+
+type DemoAccount = {
+  id: AuthMode
+  initials: string
+  fullName: string
+  rolePill: string
+  email: string
+  password: string
+}
 
 export function LoginPage() {
+  useLangRefresh()
   const t = strings()
-  const pwdWord = t.auth.password.toLowerCase()
-  const [authMode, setAuthMode] = useState<'passenger' | 'driver'>('passenger')
+  const [authMode, setAuthMode] = useState<AuthMode>('passenger')
+  const [showPwd, setShowPwd] = useState(false)
+  const [revealedDemo, setRevealedDemo] = useState<AuthMode | null>(null)
   const loginSchema = useMemo(() => buildLoginSchema(t), [t])
   const navigate = useNavigate()
   const [sp] = useSearchParams()
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
-  const form = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema), defaultValues: { identifier: '', password: '' } })
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { identifier: '', password: '' },
+  })
 
   const mut = useMutation({
     mutationFn: (v: LoginFormValues) => login(v.identifier, v.password),
@@ -60,21 +76,7 @@ export function LoginPage() {
     },
   })
 
-  const driverDemoMut = useMutation({
-    mutationFn: driverDemoLogin,
-    onSuccess: async (res) => {
-      if ('error' in res) {
-        push(strings().auth.demoDriverUnavailable, 'error')
-        return
-      }
-      await qc.invalidateQueries({ queryKey: ['me'] })
-      await qc.invalidateQueries({ queryKey: ['driverUi', res.accountId] })
-      push(strings().notifications.loginOk, 'success')
-      navigate('/driver', { replace: true })
-    },
-  })
   const googleOnce = useRef(false)
-
   useEffect(() => {
     if (sp.get('google') === '1' && !googleOnce.current) {
       googleOnce.current = true
@@ -82,139 +84,246 @@ export function LoginPage() {
     }
   }, [sp, googleMut])
 
+  const demoAccounts: DemoAccount[] = [
+    {
+      id: 'passenger',
+      initials: 'LH',
+      fullName: 'Lejla Hasanović',
+      rolePill: t.auth.passengerMode.toLowerCase(),
+      email: DEMO_PASSENGER_EMAIL,
+      password: DEMO_PASSENGER_PASSWORD,
+    },
+    {
+      id: 'driver',
+      initials: 'AK',
+      fullName: 'Amir K.',
+      rolePill: t.auth.driverMode.toLowerCase(),
+      email: DEMO_DRIVER_EMAIL,
+      password: DEMO_DRIVER_PASSWORD,
+    },
+  ]
+
+  function fillFromDemo(d: DemoAccount) {
+    setAuthMode(d.id)
+    form.setValue('identifier', d.email, { shouldValidate: true })
+    form.setValue('password', d.password, { shouldValidate: true })
+  }
+
+  const submitting = mut.isPending || googleMut.isPending
+
   return (
-    <AuthScreenLayout>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="mx-auto w-full max-w-lg"
-      >        
-        <AuthCard title={t.brand}>
-          <form className="space-y-3" onSubmit={form.handleSubmit((v) => mut.mutate(v))}>
-            <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/20 bg-white/[0.05] p-1">
-              <button
-                type="button"
-                onClick={() => setAuthMode('passenger')}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-                  authMode === 'passenger' ? 'bg-white/15 text-white' : 'text-stone-300 hover:text-white'
-                }`}
-              >
-                {t.auth.passengerMode}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode('driver')}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-                  authMode === 'driver' ? 'bg-white/15 text-white' : 'text-stone-300 hover:text-white'
-                }`}
-              >
-                {t.auth.driverMode}
-              </button>
-            </div>
-            <div className="space-y-1.5 text-left">
-              <p className="text-sm text-stone-300">{t.auth.loginIdentifierLabel}</p>
-              <Input
-                id="idf"
-                aria-label={t.auth.loginIdentifierLabel}
-                {...form.register('identifier')}
-                autoComplete="username"
-                placeholder={t.auth.loginIdentifierLabel}
-              />
-              {form.formState.errors.identifier?.message ? (
-                <p className="text-xs text-brand-danger">{form.formState.errors.identifier.message}</p>
-              ) : null}
-            </div>
-            <div className="space-y-1.5 text-left">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm text-stone-300">{t.auth.password}</p>
-                <Link to="/reset-password" className="text-xs font-medium text-teal-300 hover:text-teal-200 hover:underline">
-                  {t.auth.forgotPassword}
-                </Link>
-              </div>
-              <Input
-                id="pw"
-                type="password"
-                aria-label={t.auth.password}
-                {...form.register('password')}
-                autoComplete="current-password"
-                placeholder={t.auth.password}
-              />
-              {form.formState.errors.password?.message ? (
-                <p className="text-xs text-brand-danger">{form.formState.errors.password.message}</p>
-              ) : null}
-            </div>
-            <Button type="submit" className="w-full" disabled={mut.isPending || googleMut.isPending || driverDemoMut.isPending}>
-              {mut.isPending ? t.common.loading : t.welcome.login}
-            </Button>
-            <div className="space-y-2">
-              <p className="text-sm text-stone-300">{t.auth.demoPassengerTitle}</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/20 bg-white/[0.06] p-2 text-left transition hover:bg-white/[0.12]"
-                  disabled={mut.isPending || googleMut.isPending || driverDemoMut.isPending}
-                  onClick={() => {
-                    setAuthMode('passenger')
-                    form.setValue('identifier', DEMO_PASSENGER_EMAIL, { shouldValidate: true })
-                    form.setValue('password', DEMO_PASSENGER_PASSWORD, { shouldValidate: true })
-                  }}
-                >
-                  <p className="text-sm font-semibold text-stone-100">{t.auth.demoPassengerSubtitle}</p>
-                  <p className="mt-0.5 text-[11px] text-stone-400">{DEMO_PASSENGER_EMAIL}</p>
-                  <p className="mt-0.5 text-[11px] text-stone-500">
-                    {pwdWord}: {DEMO_PASSENGER_PASSWORD}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  className="rounded-xl border border-white/20 bg-white/[0.06] p-2 text-left transition hover:bg-white/[0.12]"
-                  disabled={mut.isPending || googleMut.isPending || driverDemoMut.isPending}
-                  onClick={() => {
-                    setAuthMode('driver')
-                    driverDemoMut.mutate()
-                  }}
-                >
-                  <p className="text-sm font-semibold text-stone-100">{t.auth.demoDriverSubtitle}</p>
-                  <p className="mt-0.5 text-[11px] text-stone-400">{DEMO_DRIVER_EMAIL}</p>
-                  <p className="mt-0.5 text-[11px] text-stone-500">
-                    {pwdWord}: {DEMO_DRIVER_PASSWORD}
-                  </p>
-                </button>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full border-2 border-white/30 bg-white/[0.05] text-stone-100 hover:bg-white/[0.12] hover:text-white"
-              disabled={googleMut.isPending || driverDemoMut.isPending}
-              onClick={() => googleMut.mutate()}
+    <>
+      <h1 className="auth-marketing-page-title font-bold tracking-tight text-[#111827]">
+        {t.auth.loginTitle}
+      </h1>
+      <p className="auth-marketing-page-subtitle mt-1 text-[14px] text-[#6B7280] md:mt-0 md:text-[13px]">
+        {t.auth.loginSubtitle}
+      </p>
+
+      <RoleToggle
+        mode={authMode}
+        onChange={setAuthMode}
+        passengerLabel={t.auth.passengerMode}
+        driverLabel={t.auth.driverMode}
+      />
+
+      <form
+        className="mt-4 flex flex-col gap-3"
+        onSubmit={form.handleSubmit((v) => mut.mutate(v))}
+      >
+        <Field
+          label={t.auth.loginIdentifierLabel}
+          htmlFor="login-idf"
+          error={form.formState.errors.identifier?.message}
+        >
+          <AuthInput
+            id="login-idf"
+            {...form.register('identifier')}
+            autoComplete="username"
+            placeholder={t.auth.loginIdentifierLabel}
+          />
+        </Field>
+
+        <Field
+          label={t.auth.password}
+          htmlFor="login-pwd"
+          error={form.formState.errors.password?.message}
+          right={
+            <Link
+              to="/reset-password"
+              className="font-medium hover:underline"
+              style={{ fontSize: 13, color: '#F5A623' }}
             >
-              <GoogleGIcon className="h-4 w-4" />
-              {t.auth.googleSim}
-            </Button>
-            <p className="text-center text-sm text-stone-300">
-              {t.auth.noAccountPrompt}{' '}
-              <Link to="/register" className="font-semibold text-teal-300 hover:text-teal-200 hover:underline">
-                {t.welcome.register}
-              </Link>
+              {t.auth.forgotPassword}
+            </Link>
+          }
+        >
+          <PasswordInput
+            id="login-pwd"
+            {...form.register('password')}
+            autoComplete="current-password"
+            placeholder={t.auth.password}
+            show={showPwd}
+            onToggleShow={() => setShowPwd((v) => !v)}
+          />
+        </Field>
+
+        <PrimaryButton type="submit" disabled={submitting}>
+          {mut.isPending ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden /> : null}
+          <span>{mut.isPending ? t.common.loading : t.welcome.login}</span>
+        </PrimaryButton>
+
+        <Divider label={t.welcome.orDivider} />
+
+        <SecondaryButton type="button" disabled={submitting} onClick={() => googleMut.mutate()}>
+          {googleMut.isPending ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+          ) : (
+            <GoogleGIcon className="h-[18px] w-[18px]" />
+          )}
+          <span className="truncate">{t.auth.googleSim}</span>
+        </SecondaryButton>
+
+        {!import.meta.env.PROD ? (
+          <div className="mt-4 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-3">
+            <p
+              className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]"
+            >
+              {t.auth.demoSectionLabel}
             </p>
-            <nav className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-1 text-xs text-stone-500">
-              <Link to="/privacy" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
-                {t.welcome.privacy}
-              </Link>
-              <span className="select-none text-stone-600">·</span>
-              <Link to="/terms" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
-                {t.welcome.terms}
-              </Link>
-              <span className="select-none text-stone-600">·</span>
-              <Link to="/support" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
-                {t.welcome.support}
-              </Link>
-            </nav>
-          </form>
-        </AuthCard>
-      </motion.div>
-    </AuthScreenLayout>
+            <div className="flex flex-col gap-1.5">
+              {demoAccounts.map((d) => (
+                <DemoRow
+                  key={d.id}
+                  demo={d}
+                  revealed={revealedDemo === d.id}
+                  onToggleReveal={() => setRevealedDemo((cur) => (cur === d.id ? null : d.id))}
+                  onSelect={() => fillFromDemo(d)}
+                  disabled={submitting}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <p className="text-center" style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
+          {t.auth.noAccountPrompt}{' '}
+          <Link
+            to="/register"
+            className="font-semibold hover:underline"
+            style={{ color: '#F5A623' }}
+          >
+            {t.welcome.register}
+          </Link>
+        </p>
+      </form>
+    </>
+  )
+}
+
+const PasswordInput = React.forwardRef<
+  HTMLInputElement,
+  React.InputHTMLAttributes<HTMLInputElement> & { show: boolean; onToggleShow: () => void }
+>(function PasswordInput({ show, onToggleShow, ...props }, ref) {
+  return (
+    <div className="relative">
+      <AuthInput
+        ref={ref}
+        type={show ? 'text' : 'password'}
+        {...props}
+        style={{ paddingRight: 44, ...props.style }}
+      />
+      <button
+        type="button"
+        onClick={onToggleShow}
+        aria-label={show ? 'Sakrij lozinku' : 'Prikaži lozinku'}
+        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-[#9CA3AF] transition-colors hover:text-[#6B7280]"
+        tabIndex={-1}
+      >
+        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
+  )
+})
+
+function DemoRow({
+  demo,
+  revealed,
+  onToggleReveal,
+  onSelect,
+  disabled,
+}: {
+  demo: DemoAccount
+  revealed: boolean
+  onToggleReveal: () => void
+  onSelect: () => void
+  disabled?: boolean
+}) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-white/80',
+      )}
+      style={{ minHeight: 40 }}
+    >
+      <button
+        type="button"
+        onClick={onSelect}
+        disabled={disabled}
+        className="flex flex-1 items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-60"
+        aria-label={`${demo.fullName} (${demo.rolePill})`}
+      >
+        <span
+          aria-hidden
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
+          style={{
+            background: '#F3F4F6',
+            color: '#374151',
+            fontSize: 12,
+            fontWeight: 700,
+          }}
+        >
+          {demo.initials}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="flex items-center gap-2">
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+              {demo.fullName}
+            </span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: '#6B7280',
+                background: '#F3F4F6',
+                borderRadius: 6,
+                padding: '1px 6px',
+              }}
+            >
+              {demo.rolePill}
+            </span>
+          </span>
+          <span className="flex items-center gap-2">
+            <span style={{ fontSize: 11, color: '#9CA3AF' }} className="truncate">
+              {demo.email}
+            </span>
+            <span aria-hidden style={{ color: '#D1D5DB' }}>
+              ·
+            </span>
+            <span style={{ fontSize: 11, color: '#9CA3AF' }}>
+              {revealed ? demo.password : '••••••••'}
+            </span>
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={onToggleReveal}
+        aria-label={revealed ? 'Sakrij lozinku' : 'Prikaži lozinku'}
+        className="rounded-md p-1.5 text-[#9CA3AF] transition-colors hover:text-[#6B7280]"
+      >
+        {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
   )
 }

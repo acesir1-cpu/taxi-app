@@ -3,6 +3,7 @@ import { useMe } from './hooks/useMe'
 import { AppShell } from './components/layout/AppShell'
 import { DriverAppShell } from './components/driver/DriverAppShell'
 import { LoadingState } from './components/common/LoadingState'
+import { AuthMarketingLayout } from './components/auth/AuthMarketingLayout'
 import { WelcomePage } from './pages/WelcomePage'
 import { RegisterPage } from './pages/RegisterPage'
 import { VerifyPage } from './pages/VerifyPage'
@@ -89,14 +90,16 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<RootRedirect />} />
-      <Route path="/welcome" element={<WelcomePage />} />
       <Route path="/admin/vozaci-fotografije" element={<AdminDriverPhotosPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/support" element={<SupportPage />} />
-      <Route element={<GuestLayout />}>
+      <Route element={<AuthMarketingLayout />}>
+        <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+      </Route>
+      <Route element={<GuestLayout />}>
         <Route path="/verify" element={<VerifyPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
       </Route>

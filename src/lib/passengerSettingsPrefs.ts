@@ -1,6 +1,6 @@
 const PREFIX = 'urbanflow:passenger:'
 
-export function passengerLsKey(accountId: string, part: 'notify' | 'personalize' | 'extras'): string {
+export function passengerLsKey(accountId: string, part: 'notify' | 'personalize' | 'extras' | 'location'): string {
   return `${PREFIX}${accountId}:${part}`
 }
 
@@ -98,4 +98,27 @@ export function loadPassengerProfileExtras(accountId: string): PassengerProfileE
 
 export function savePassengerProfileExtras(accountId: string, p: PassengerProfileExtrasState): void {
   localStorage.setItem(passengerLsKey(accountId, 'extras'), JSON.stringify(p))
+}
+
+export type PassengerLocationPrefsState = {
+  gps: boolean
+  gpsPromptSeen: boolean
+}
+
+export function defaultPassengerLocationPrefs(): PassengerLocationPrefsState {
+  return { gps: true, gpsPromptSeen: false }
+}
+
+export function loadPassengerLocationPrefs(accountId: string): PassengerLocationPrefsState {
+  try {
+    const r = localStorage.getItem(passengerLsKey(accountId, 'location'))
+    if (!r) return defaultPassengerLocationPrefs()
+    return { ...defaultPassengerLocationPrefs(), ...JSON.parse(r) }
+  } catch {
+    return defaultPassengerLocationPrefs()
+  }
+}
+
+export function savePassengerLocationPrefs(accountId: string, p: PassengerLocationPrefsState): void {
+  localStorage.setItem(passengerLsKey(accountId, 'location'), JSON.stringify(p))
 }

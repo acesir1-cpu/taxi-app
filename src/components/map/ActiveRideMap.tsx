@@ -1,8 +1,9 @@
 import L from 'leaflet'
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap, ZoomControl } from 'react-leaflet'
 import { cn } from '../../lib/utils'
 import type { Location, Ride } from '../../types/domain'
+import { trimPolylineAhead } from '../../utils/route'
 import { destIcon, driverIcon, pickupIcon } from './mapIcons'
 import { FitBounds } from './FitBounds'
 
@@ -113,10 +114,20 @@ export default function ActiveRideMap({
     [driverPos.lat, driverPos.lng],
     [pickup.lat, pickup.lng],
   ]
-  const approachPositions: Array<[number, number]> =
-    approachPolyline && approachPolyline.length >= 2
-      ? approachPolyline.map((p) => [p.lat, p.lng] as [number, number])
-      : approachLine
+  const approachPositions: Array<[number, number]> = useMemo(() => {
+    if (approachPolyline && approachPolyline.length >= 2) {
+      const trimmed = trimPolylineAhead(approachPolyline, driverPos)
+      if (trimmed.length < 2) {
+        return [
+          [driverPos.lat, driverPos.lng],
+          [pickup.lat, pickup.lng],
+        ]
+      }
+      const rest = trimmed.slice(1).map((p) => [p.lat, p.lng] as [number, number])
+      return [[driverPos.lat, driverPos.lng], ...rest]
+    }
+    return approachLine
+  }, [approachPolyline, driverPos.lat, driverPos.lng, pickup.lat, pickup.lng])
   const showApproach = ride.status === 'dodijeljena' || ride.status === 'vozac_na_putu'
 
   return (
@@ -161,7 +172,7 @@ export default function ActiveRideMap({
         ) : null}
         <Marker position={[pickup.lat, pickup.lng]} icon={pickupIcon} />
         <Marker position={[destination.lat, destination.lng]} icon={destIcon} />
-        <Marker position={[driverPos.lat, driverPos.lng]} icon={driverIcon} />
+        <Marker position={[driverPos.lat, driverPos.lng]} icon={driverIcon} zIndexOffset={800} />
         {showArrivalPopup ? (
           <Popup position={[driverPos.lat, driverPos.lng]} autoPan={false} closeButton={false} closeOnClick={false}>
             {arrivalPopupText}

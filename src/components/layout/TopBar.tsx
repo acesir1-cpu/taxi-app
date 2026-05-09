@@ -4,17 +4,26 @@ import { Bell, CalendarClock, Car, History, LogOut, Navigation, Settings, User, 
 import { AppLogo } from '../brand/AppLogo'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { strings } from '../../i18n/strings'
+import { notificationDeepLink } from '../../lib/notificationDeepLink'
 import {
   deleteAllNotifications,
+  deleteNotification,
   getNotifications,
   markAllRead,
   markNotificationRead,
 } from '../../services/notificationApi'
+import {
+  NotificationBottomSheet,
+  NotificationSheetDeleteAllButton,
+  NotificationSheetMarkAllReadButton,
+} from '../notifications/NotificationBottomSheet'
+import { NotificationDesktopDropdown } from '../notifications/NotificationDesktopDropdown'
 import { NotificationDropdownList } from '../notifications/NotificationDropdownList'
-import { Button } from '../ui/button'
 import { cn } from '../../lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import { useLangRefresh } from '../../hooks/useLangRefresh'
+import { useMarkAllNotificationsReadWhenPanelOpen } from '../../hooks/useMarkAllNotificationsReadWhenPanelOpen'
+import { useMinWidth768 } from '../../hooks/useMinWidth768'
 import { loadPassengerProfileExtras } from '../../lib/passengerSettingsPrefs'
 import { logout } from '../../services/authApi'
 
@@ -26,32 +35,28 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
-  const [hadOpenSession, setHadOpenSession] = useState(false)
   const [avatarDataUrl, setAvatarDataUrl] = useState(() => loadPassengerProfileExtras(accountId).avatarDataUrl ?? '')
-  const notificationsDropdownRef = useRef<HTMLDivElement>(null)
-  const bellRef = useRef<HTMLButtonElement>(null)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const bellTriggerRef = useRef<HTMLDivElement>(null)
+  const isDesktopNotifications = useMinWidth768()
   const { data: notifications = [] } = useQuery({
     queryKey: ['notifications', accountId],
     queryFn: () => getNotifications(accountId),
   })
   const unread = notifications.filter((n) => !n.read).length
+  useMarkAllNotificationsReadWhenPanelOpen(open, accountId, unread)
 
   useEffect(() => {
-    if (!open && !profileMenuOpen) return
+    if (!profileMenuOpen) return
     function onDocClick(e: MouseEvent) {
       const target = e.target as Node
-      if (notificationsDropdownRef.current?.contains(target)) return
-      if (bellRef.current?.contains(target)) return
       if (profileMenuRef.current?.contains(target)) return
       if (profileButtonRef.current?.contains(target)) return
-      setOpen(false)
       setProfileMenuOpen(false)
     }
     function onEsc(e: KeyboardEvent) {
       if (e.key === 'Escape') {
-        setOpen(false)
         setProfileMenuOpen(false)
       }
     }
@@ -61,24 +66,7 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
       document.removeEventListener('mousedown', onDocClick)
       document.removeEventListener('keydown', onEsc)
     }
-  }, [open, profileMenuOpen])
-
-  useEffect(() => {
-    if (open) {
-      setHadOpenSession(true)
-      return
-    }
-    if (!hadOpenSession) return
-    if (unread === 0) {
-      setHadOpenSession(false)
-      return
-    }
-    void (async () => {
-      await markAllRead(accountId)
-      await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
-      setHadOpenSession(false)
-    })()
-  }, [accountId, hadOpenSession, open, qc, unread])
+  }, [profileMenuOpen])
 
   useEffect(() => {
     const close = () => {
@@ -109,11 +97,11 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
   return (
     <header
       className={cn(
-        'app-top-bar sticky top-0 z-[280] border-b border-slate-200/80 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.03)] backdrop-blur-xl backdrop-saturate-150',
+        'app-top-bar sticky top-0 z-[280] overflow-visible border-b border-slate-200/80 bg-white/90 shadow-[0_1px_0_rgba(15,23,42,0.04),0_8px_24px_rgba(15,23,42,0.03)] backdrop-blur-xl backdrop-saturate-150',
         hideOnMobileOrderMap && 'hidden lg:block'
       )}
     >
-      <div className="mx-auto flex h-14 max-w-[82rem] items-center justify-between gap-3 px-4 sm:h-16 sm:gap-5 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-[82rem] items-center justify-between gap-3 overflow-visible px-4 sm:h-16 sm:gap-5 sm:px-6">
         <Link
           to="/app/order"
           className="flex min-w-0 items-center py-1 outline-none ring-brand-teal/40 transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-offset-2"
@@ -126,79 +114,75 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
           <AppNavLink to="/app/scheduled" icon={<CalendarClock className="h-4 w-4" />} label={t.nav.scheduled} />
           <AppNavLink to="/app/history" icon={<History className="h-4 w-4" />} label={t.nav.history} />
         </nav>
-        <div className="flex items-center gap-2.5 md:gap-3">
-          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-1.5 py-1 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
-            <div className="relative">
-            <button
-              ref={bellRef}
-              type="button"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-brand-navy transition-colors duration-150 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40"
-              aria-label={t.notifications.bell}
-              onClick={() => {
-                setOpen((v) => !v)
-                setProfileMenuOpen(false)
-              }}
-            >
-              <Bell className="h-5 w-5" />
-              {unread > 0 ? (
-                <span className="absolute -right-0.5 top-0 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-brand-danger px-0.5 text-[8px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
-                  {unread > 9 ? '9+' : unread}
-                </span>
-              ) : null}
-            </button>
-            {open ? (
-              <motion.div
-                ref={notificationsDropdownRef}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="absolute right-0 z-[320] mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-slate-200/80 bg-white p-2 shadow-[0_10px_28px_rgba(15,23,42,0.12)]"
+        <div className="flex items-center gap-2.5 overflow-visible md:gap-3">
+          <div className="flex items-center gap-1.5 overflow-visible rounded-xl border border-slate-200/80 bg-white px-1.5 py-1 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
+            <div className="relative overflow-visible" ref={bellTriggerRef}>
+              <button
+                type="button"
+                className="relative flex h-9 w-9 items-center justify-center rounded-lg text-brand-navy transition-colors duration-150 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal/40"
+                aria-label={t.notifications.bell}
+                aria-expanded={open}
+                aria-haspopup="dialog"
+                onClick={() => {
+                  setOpen((v) => !v)
+                  setProfileMenuOpen(false)
+                }}
               >
-                <span className="pointer-events-none absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t border-slate-200/80 bg-white" aria-hidden />
-                <div className="flex items-center justify-between gap-2 px-2 pb-2">
-                  <p className="text-xs font-semibold text-slate-500">{t.notifications.bell}</p>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-[11px] font-semibold text-brand-teal hover:bg-teal-50 hover:text-brand-teal"
-                      disabled={unread === 0}
-                      onClick={async () => {
-                        await markAllRead(accountId)
+                <Bell className="h-5 w-5" />
+                {unread > 0 ? (
+                  <span className="absolute -right-0.5 top-0 flex h-4 min-w-[18px] items-center justify-center rounded-full bg-emerald-500 px-0.5 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
+                    {unread > 9 ? '9+' : unread}
+                  </span>
+                ) : null}
+              </button>
+              {isDesktopNotifications ? (
+                <NotificationDesktopDropdown
+                  open={open}
+                  onClose={() => setOpen(false)}
+                  triggerRef={bellTriggerRef}
+                  headerActions={
+                    <>
+                      <NotificationSheetMarkAllReadButton
+                        disabled={unread === 0}
+                        onClick={async () => {
+                          await markAllRead(accountId)
+                          await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                        }}
+                      >
+                        Pročitaj sve
+                      </NotificationSheetMarkAllReadButton>
+                      <NotificationSheetDeleteAllButton
+                        disabled={notifications.length === 0}
+                        onClick={async () => {
+                          await deleteAllNotifications(accountId)
+                          await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                          setOpen(false)
+                        }}
+                      >
+                        Obriši sve
+                      </NotificationSheetDeleteAllButton>
+                    </>
+                  }
+                >
+                  <ul className="pb-2">
+                    <NotificationDropdownList
+                      notifications={notifications}
+                      t={t}
+                      onItemActivate={async (n) => {
+                        await markNotificationRead(n.id, accountId)
                         await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
-                      }}
-                    >
-                      {t.notifications.markAllRead}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-[11px] font-semibold text-[#EF4444] hover:bg-red-50 hover:text-[#DC2626]"
-                      disabled={notifications.length === 0}
-                      onClick={async () => {
-                        await deleteAllNotifications(accountId)
-                        await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                        navigate(notificationDeepLink(n, 'passenger'))
                         setOpen(false)
                       }}
-                    >
-                      {t.notifications.deleteAll}
-                    </Button>
-                  </div>
-                </div>
-                <ul className="max-h-72 space-y-1 overflow-y-auto">
-                  <NotificationDropdownList
-                    notifications={notifications}
-                    t={t}
-                    maxItems={20}
-                    onItemActivate={async (n) => {
-                      await markNotificationRead(n.id, accountId)
-                      await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
-                    }}
-                  />
-                </ul>
-              </motion.div>
-            ) : null}
+                      onItemDelete={async (n) => {
+                        await deleteNotification(n.id, accountId)
+                        await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                      }}
+                    />
+                  </ul>
+                </NotificationDesktopDropdown>
+              ) : null}
+            </div>
           </div>
           <span className="hidden h-6 w-px shrink-0 bg-slate-200 lg:block" aria-hidden />
           <div className="relative hidden lg:block">
@@ -284,9 +268,54 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
               </motion.div>
             ) : null}
           </div>
-          </div>
         </div>
       </div>
+      {!isDesktopNotifications ? (
+        <NotificationBottomSheet
+          open={open}
+          onClose={() => setOpen(false)}
+          headerActions={
+            <>
+              <NotificationSheetMarkAllReadButton
+                disabled={unread === 0}
+                onClick={async () => {
+                  await markAllRead(accountId)
+                  await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                }}
+              >
+                Pročitaj sve
+              </NotificationSheetMarkAllReadButton>
+              <NotificationSheetDeleteAllButton
+                disabled={notifications.length === 0}
+                onClick={async () => {
+                  await deleteAllNotifications(accountId)
+                  await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                  setOpen(false)
+                }}
+              >
+                Obriši sve
+              </NotificationSheetDeleteAllButton>
+            </>
+          }
+        >
+          <ul className="flex-1 overflow-y-auto pb-3">
+            <NotificationDropdownList
+              notifications={notifications}
+              t={t}
+              onItemActivate={async (n) => {
+                await markNotificationRead(n.id, accountId)
+                await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                navigate(notificationDeepLink(n, 'passenger'))
+                setOpen(false)
+              }}
+              onItemDelete={async (n) => {
+                await deleteNotification(n.id, accountId)
+                await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+              }}
+            />
+          </ul>
+        </NotificationBottomSheet>
+      ) : null}
     </header>
   )
 }

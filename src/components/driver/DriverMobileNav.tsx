@@ -14,7 +14,6 @@ import {
   mobileNavOverflowSheetRowDivider,
   mobileNavOverflowSheetRowDividerDanger,
   mobileTabBarItemClass,
-  mobileTabBarNavLinkClass,
   mobileTabBarNavShellClassName,
 } from '../layout/mobileNavPrimitives'
 
@@ -38,6 +37,7 @@ export function DriverMobileNav() {
 
   const settingsActive =
     location.pathname === '/driver/settings' || settingsMenuOpen
+  const navLinkClass = ({ isActive }: { isActive: boolean }) => mobileTabBarItemClass(!settingsMenuOpen && isActive)
 
   return (
     <>
@@ -75,26 +75,26 @@ export function DriverMobileNav() {
         role="navigation"
         aria-label={t.driver.mobileNavAria}
       >
-        <NavLink to="/driver" end className={mobileTabBarNavLinkClass}>
+        <NavLink to="/driver" end className={navLinkClass}>
           <LayoutDashboard className="h-5 w-5" />
           {t.driver.navHomeShort}
         </NavLink>
-        <NavLink to="/driver/active" className={mobileTabBarNavLinkClass}>
+        <NavLink to="/driver/active" className={navLinkClass}>
           <Car className="h-5 w-5" />
           {t.driver.navActiveShort}
         </NavLink>
-        <NavLink to="/driver/history" className={mobileTabBarNavLinkClass}>
+        <NavLink to="/driver/history" className={navLinkClass}>
           <History className="h-5 w-5" />
           {t.driver.navHistory}
         </NavLink>
-        <NavLink to="/driver/earnings" className={mobileTabBarNavLinkClass}>
+        <NavLink to="/driver/earnings" className={navLinkClass}>
           <Banknote className="h-5 w-5" />
           {t.driver.navEarnings}
         </NavLink>
         <button
           type="button"
           className={mobileTabBarItemClass(settingsActive)}
-          onClick={() => setSettingsMenuOpen(true)}
+          onClick={() => setSettingsMenuOpen((open) => !open)}
         >
           <Settings className="h-5 w-5" />
           {t.driver.navSettings}

@@ -1,6 +1,6 @@
 import type { DriverAvatarPendingRequest } from '../types/domain'
 import { delay } from './delay'
-import { addNotificationRaw } from './notificationApi'
+import { appendNotification } from './notificationApi'
 import { getDb, persist } from './mockDb'
 
 function rid(): string {
@@ -58,12 +58,14 @@ export async function approveDriverAvatarRequest(requestId: string): Promise<{ o
   req.status = 'approved'
   persist()
   window.dispatchEvent(new CustomEvent('urbanflow:driver-avatar-updated', { detail: { driverId: req.driverId } }))
-  await addNotificationRaw(
-    req.driverAccountId,
-    'Profilna fotografija odobrena',
-    'Administrator je odobrio vašu novu profilnu fotografiju. Ona je sada vidljiva putnicima i u aplikaciji.',
-    'account',
-  )
+  await appendNotification({
+    accountId: req.driverAccountId,
+    type: 'ACCOUNT_UPDATE',
+    title: 'Profil ažuriran',
+    body: 'Administrator je odobrio vašu novu profilnu fotografiju. Ona je sada vidljiva putnicima.',
+    targetApp: 'driver',
+    showBanner: false,
+  })
   return { ok: true }
 }
 
@@ -82,6 +84,13 @@ export async function rejectDriverAvatarRequest(
   const body = note?.trim()
     ? `Administrator je odbio zahtjev. Napomena: ${note.trim()}`
     : 'Administrator je odbio zahtjev za novu profilnu fotografiju. Možete poslati drugu sliku koja poštuje pravila zajednice.'
-  await addNotificationRaw(req.driverAccountId, 'Profilna fotografija nije odobrena', body, 'account')
+  await appendNotification({
+    accountId: req.driverAccountId,
+    type: 'ACCOUNT_UPDATE',
+    title: 'Profil ažuriran',
+    body,
+    targetApp: 'driver',
+    showBanner: false,
+  })
   return { ok: true }
 }

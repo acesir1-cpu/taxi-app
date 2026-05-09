@@ -1,5 +1,6 @@
 import { ChevronLeft } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { strings } from '../../i18n/strings'
@@ -7,12 +8,20 @@ import { AppLogo } from '../brand/AppLogo'
 import { PageContainer } from '../layout/PageContainer'
 import { NightRideBackground } from '../common/NightRideBackground'
 
-/** Same night ride stack as welcome — login, register, verify. */
+/** Ista brand pozadina kao welcome, s jačim „frost“ slojem za čitljivost formi. */
 export function AuthScreenLayout({ children }: { children: ReactNode }) {
   const t = strings()
+
+  useEffect(() => {
+    document.body.classList.add('auth-screen')
+    return () => {
+      document.body.classList.remove('auth-screen')
+    }
+  }, [])
+
   return (
     <NightRideBackground variant="auth">
-      <PageContainer className="relative z-10 flex min-h-screen flex-col px-4 py-8 sm:py-10">
+      <PageContainer className="relative z-10 flex min-h-screen min-h-[100svh] min-h-[100dvh] flex-col px-4 py-8 sm:py-10">
         <motion.div
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -29,9 +38,9 @@ export function AuthScreenLayout({ children }: { children: ReactNode }) {
         >
           <Link
             to="/welcome"
-            className="inline-flex items-center gap-1.5 rounded-full border-2 border-white/35 bg-white/18 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-black/25 backdrop-blur-md transition-colors hover:border-white/55 hover:bg-white/28 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-stone-950/80"
+            className="inline-flex items-center gap-1.5 rounded-full border-2 border-brand-navy/12 bg-white/92 px-4 py-2.5 text-sm font-semibold text-brand-navy shadow-md shadow-slate-900/8 backdrop-blur-md transition-colors hover:border-brand-navy/22 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           >
-            <ChevronLeft className="h-5 w-5 shrink-0 -ml-0.5" strokeWidth={2.5} aria-hidden />
+            <ChevronLeft className="h-5 w-5 shrink-0 -ml-0.5 text-brand-navy" strokeWidth={2.5} aria-hidden />
             {t.auth.backToWelcome}
           </Link>
         </motion.div>

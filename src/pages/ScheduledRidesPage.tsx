@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, Clock3, MapPin, PencilLine, Trash2 } from 'lucide-react'
+import { CalendarClock, Clock3, MapPin, PencilLine, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
@@ -11,6 +11,7 @@ import {
   updateScheduledRideRequest,
 } from '../services/rideApi'
 import { LocationSearch } from '../components/ride/LocationSearch'
+import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -46,8 +47,14 @@ export function ScheduledRidesPage() {
   const requests = useMemo(() => scheduledQ.data ?? [], [scheduledQ.data])
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4">
-      <h1 className="px-4 text-xl font-bold text-brand-navy">{t.nav.scheduled}</h1>
+    <div
+      className={cn(
+        'relative mx-auto w-full max-w-[1200px] space-y-4',
+        'max-lg:-mx-4 max-lg:min-h-[100dvh] max-lg:px-4 max-lg:pb-6 sm:max-lg:-mx-6 sm:max-lg:px-6',
+        'lg:mx-auto lg:min-h-0 lg:pb-0'
+      )}
+    >
+      <h1 className="text-xl font-bold text-brand-navy lg:px-4">{t.nav.scheduled}</h1>
 
       {scheduledQ.isLoading ? (
         <p className="text-sm text-slate-500">{t.common.loading}</p>
@@ -109,27 +116,23 @@ export function ScheduledRidesPage() {
                   <p className="text-xs font-bold text-indigo-700">{request.estimatedPrice.toFixed(2)} BAM</p>
                 </div>
                 <div className="flex gap-2 pt-0.5">
-                  <Button
+                  <button
                     type="button"
-                    variant="outlineThin"
-                    size="sm"
-                    className="w-full"
+                    className="flex h-10 min-h-0 flex-1 items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-[#E5E7EB] bg-transparent text-sm font-semibold text-brand-navy transition active:scale-[0.98]"
                     onClick={() => setEditing(request)}
                   >
-                    <PencilLine className="h-3.5 w-3.5" />
+                    <PencilLine className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     {t.common.edit}
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-9 w-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                    className="flex h-10 min-h-0 flex-1 items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-[#FECACA] bg-transparent text-sm font-semibold text-[#EF4444] transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
                     disabled={cancelMut.isPending}
                     onClick={() => setCancelConfirm(request)}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     {t.ride.cancel}
-                  </Button>
+                  </button>
                 </div>
               </CardContent>
             </Card>
@@ -186,6 +189,19 @@ export function ScheduledRidesPage() {
           />
         </div>
       ) : null}
+
+      <button
+        type="button"
+        className="fixed z-[105] flex h-[52px] w-[52px] items-center justify-center rounded-full bg-[#F5A623] text-white shadow-[0_8px_24px_rgba(15,23,42,0.2)] lg:hidden"
+        style={{
+          bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
+          right: 20,
+        }}
+        aria-label={t.order.scheduleRide}
+        onClick={() => navigate('/app/order', { state: { focusSchedule: true } })}
+      >
+        <Plus className="h-6 w-6 text-white" strokeWidth={2.25} aria-hidden />
+      </button>
     </div>
   )
 }

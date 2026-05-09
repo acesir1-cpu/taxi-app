@@ -20,3 +20,11 @@ export const driverIcon = L.divIcon({
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 })
+
+/** Simulated nearby taxis on order map — yellow dots (not vehicle glyphs). */
+export const simDriverFleetIcon = L.divIcon({
+  className: 'uf-marker uf-sim-fleet',
+  html: '<div style="width:12px;height:12px;border-radius:9999px;background:#F5A623;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.22)" aria-hidden></div>',
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+})

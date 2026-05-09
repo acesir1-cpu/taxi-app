@@ -1,6 +1,6 @@
 import type { Complaint, ComplaintCategory } from '../types/domain'
 import { delay } from './delay'
-import { addNotification } from './notificationApi'
+import { appendNotification } from './notificationApi'
 import { getDb, persist } from './mockDb'
 
 function uid(): string {
@@ -42,7 +42,15 @@ export async function createComplaint(
     createdAt: new Date().toISOString(),
   })
   persist()
-  await addNotification(accountId, 'inboxComplaint', 'complaintOk', 'complaint')
+  await appendNotification({
+    accountId,
+    type: 'SYSTEM_MESSAGE',
+    title: 'Prijava zaprimljena',
+    body: 'Vaša prijava problema je zabilježena. Javit ćemo vam se ako bude potrebno.',
+    rideId: complaint.rideId,
+    targetApp: 'passenger',
+    showBanner: false,
+  })
   return { ok: true, complaint }
 }
 

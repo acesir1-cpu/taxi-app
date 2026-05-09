@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { MapPin } from 'lucide-react'
+import { MapPin, X } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import type { Location } from '../../types/domain'
 import { strings } from '../../i18n/strings'
@@ -17,6 +17,7 @@ export function LocationSearch({
   placeholder,
   emptyHint,
   rightAction,
+  formReset,
 }: {
   label: string
   value: Location | null
@@ -25,6 +26,8 @@ export function LocationSearch({
   /** Poruka kada nema pogodaka (npr. nakon geokodiranja). */
   emptyHint?: string
   rightAction?: ReactNode
+  /** Inline clear (e.g. full form reset) shown before `rightAction`. */
+  formReset?: { onClick: () => void; ariaLabel: string; visible: boolean }
 }) {
   const t = strings()
   const [q, setQ] = useState(value?.label ?? '')
@@ -63,13 +66,16 @@ export function LocationSearch({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
+  const showFormReset = Boolean(formReset?.visible)
+  const inputPadRight = showFormReset && rightAction ? 'pr-[7.5rem]' : showFormReset ? 'pr-12' : rightAction ? 'pr-11' : undefined
+
   return (
     <div ref={wrapRef} className="relative space-y-1.5">
       <Label className="text-sm font-semibold text-slate-800">{label}</Label>
       <div className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <Input
-          className={cn('h-11 pl-9', rightAction ? 'pr-11' : undefined)}
+          className={cn('h-11 pl-9', inputPadRight)}
           placeholder={placeholder}
           value={q}
           onFocus={() => setOpen(true)}
@@ -79,8 +85,24 @@ export function LocationSearch({
             onChange(null)
           }}
         />
-        {rightAction ? (
-          <div className="absolute right-2 top-1/2 z-10 -translate-y-1/2">{rightAction}</div>
+        {showFormReset || rightAction ? (
+          <div className="absolute right-2 top-1/2 z-10 flex -translate-y-1/2 items-center gap-1">
+            {showFormReset && formReset ? (
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition active:scale-[0.98]"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  formReset.onClick()
+                }}
+                aria-label={formReset.ariaLabel}
+              >
+                <X className="h-4 w-4" strokeWidth={2.25} aria-hidden />
+              </button>
+            ) : null}
+            {rightAction}
+          </div>
         ) : null}
         {open ? (
           <ul

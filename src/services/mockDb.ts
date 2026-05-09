@@ -67,9 +67,16 @@ function normalizeDb(db: MockDatabase): boolean {
     }
   }
   for (const d of db.drivers) {
-    const normalized = DRIVER_STATUS_MAP[d.availabilityStatus]
-    if (normalized && normalized !== d.availabilityStatus) {
-      d.availabilityStatus = normalized
+    const mapped = DRIVER_STATUS_MAP[d.availabilityStatus as string]
+    if (mapped && mapped !== d.availabilityStatus) {
+      d.availabilityStatus = mapped
+      changed = true
+    }
+  }
+  const validAvail: DriverAvailability[] = ['dostupan', 'zauzet', 'na_pauzi', 'van_smjene', 'van_funkcije']
+  for (const d of db.drivers) {
+    if (!validAvail.includes(d.availabilityStatus)) {
+      d.availabilityStatus = 'dostupan'
       changed = true
     }
   }
@@ -77,6 +84,13 @@ function normalizeDb(db: MockDatabase): boolean {
     const normalized = VEHICLE_STATUS_MAP[v.status]
     if (normalized && normalized !== v.status) {
       v.status = normalized
+      changed = true
+    }
+  }
+  const validVeh: VehicleStatus[] = ['dostupno', 'u_servisu', 'nedostupno']
+  for (const v of db.vehicles) {
+    if (!validVeh.includes(v.status)) {
+      v.status = 'dostupno'
       changed = true
     }
   }

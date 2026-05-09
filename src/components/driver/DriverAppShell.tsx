@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useMe } from '../../hooks/useMe'
 import { useLangRefresh } from '../../hooks/useLangRefresh'
@@ -18,6 +19,13 @@ export function DriverAppShell() {
   const summaryOpen = useDriverRideSummaryStore((s) => s.open)
   const summary = useDriverRideSummaryStore((s) => s.summary)
   const closeSummary = useDriverRideSummaryStore((s) => s.close)
+
+  useEffect(() => {
+    document.body.classList.add('app-mobile-nav')
+    return () => {
+      document.body.classList.remove('app-mobile-nav')
+    }
+  }, [])
 
   if (isLoading || !me || me.kind !== 'driver') {
     return (
@@ -42,7 +50,7 @@ export function DriverAppShell() {
         name={me.driverProfile.fullName}
         linkedDriverId={me.driverProfile.linkedDriverId}
       />
-      <MobileFloatingNotifications accountId={me.account.id} hidden={hideMobileBell} />
+      <MobileFloatingNotifications accountId={me.account.id} appRole="driver" hidden={hideMobileBell} />
       <main className="mx-auto flex w-full max-w-[82rem] flex-col gap-6 px-4 py-6 sm:px-6">
         <Outlet context={ctx} />
       </main>

@@ -6,7 +6,7 @@ import { demoGlassDividerClass, demoGlassPanelClass } from '../lib/demoGlassPane
 import { cn } from '../lib/utils'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
-import type { Driver, Ride, RideStatus, Vehicle } from '../types/domain'
+import type { Ride, RideStatus } from '../types/domain'
 import { generateDriverStartNearPickup } from '../utils/driverSim'
 import { buildDriverAnimationPath } from '../utils/driverRouteAnimation'
 import { distanceAlongPolylineKm, haversineKm } from '../utils/distance'
@@ -29,6 +29,7 @@ import { MapChunkFallback } from '../components/map/MapChunkFallback'
 
 const ActiveRideMap = lazy(() => import('../components/map/ActiveRideMap'))
 import { RideStatusBadge } from '../components/common/StatusBadge'
+import { RideDriverCard } from '../components/ride/RideDriverCard'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -800,13 +801,6 @@ export function RidePage() {
   )
 }
 
-function driverInitials(firstName: string, lastName: string): string {
-  const first = (firstName || '').trim().charAt(0)
-  const rawLast = (lastName || '').trim()
-  const last = rawLast.charAt(0)
-  return `${first}${first && last ? '.' : ''}${last}`.toUpperCase() || '?'
-}
-
 const RIDE_PROGRESS_KEYS = ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku', 'zavrsena'] as const
 const RIDE_PROGRESS_LABELS = ['Dodjeljen', 'Na putu', 'Stigao', 'Vožnja', 'Završeno'] as const
 
@@ -914,51 +908,3 @@ function RideEstimateSection({
   )
 }
 
-function RideDriverCard({
-  driver,
-  vehicle,
-  t,
-  distPickup,
-}: {
-  driver: Driver
-  vehicle: Vehicle
-  t: ReturnType<typeof strings>
-  distPickup: number
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{t.ride.driverVehicleTitle}</CardTitle>
-      </CardHeader>
-      <CardContent className="text-sm">
-        <div className="flex items-center gap-3">
-          {driver.avatarUrl ? (
-            <img
-              src={driver.avatarUrl}
-              alt={`${driver.firstName} ${driver.lastName}`}
-              className="h-12 w-12 shrink-0 rounded-full border border-slate-200 object-cover"
-            />
-          ) : (
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-navy text-sm font-extrabold text-white">
-              {driverInitials(driver.firstName, driver.lastName)}
-            </div>
-          )}
-          <div className="min-w-0 space-y-1">
-            <p className="truncate font-semibold text-brand-navy">
-              {driver.firstName} {driver.lastName} · ⭐ {driver.rating.toFixed(1)}
-            </p>
-            <p className="truncate text-slate-600">
-              {vehicle.brand} {vehicle.model} · {vehicle.registration}
-            </p>
-            <p className="text-slate-500">
-              {t.ride.distanceToYou} ~
-              {distPickup < 0.1
-                ? (distPickup * 1000).toFixed(0) + ' ' + t.ride.metersUnit
-                : distPickup.toFixed(2) + ' ' + t.ride.kmUnit}
-            </p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}

@@ -1,7 +1,7 @@
 import type { AuthSession, PassengerProfile, UserAccount, UserRole } from '../types/domain'
 import { DEMO_DRIVER_ACCOUNT_ID } from '../data/seed'
 import { delay } from './delay'
-import { addNotification } from './notificationApi'
+import { appendNotification } from './notificationApi'
 import { getDb, persist } from './mockDb'
 
 function uid(prefix: string): string {
@@ -56,7 +56,14 @@ export async function register(data: RegisterInput): Promise<{ accountId: string
   db.pendingVerificationAccountIds.push(account.id)
   logActivity(account.id, 'Registracija započeta')
   persist()
-  await addNotification(account.id, 'inboxAccount', 'accountCreated', 'account')
+  await appendNotification({
+    accountId: account.id,
+    type: 'SYSTEM_MESSAGE',
+    title: 'Račun kreiran',
+    body: 'Vaš račun je kreiran. Dovršite verifikaciju.',
+    targetApp: 'passenger',
+    showBanner: false,
+  })
   return { accountId: account.id }
 }
 
@@ -76,7 +83,14 @@ export async function verifyCode(
   user.lastLoginAt = new Date().toISOString()
   logActivity(accountId, 'Račun verifikovan')
   persist()
-  await addNotification(accountId, 'inboxAccount', 'accountActivated', 'account')
+  await appendNotification({
+    accountId,
+    type: 'SYSTEM_MESSAGE',
+    title: 'Račun aktiviran',
+    body: 'Vaš račun je sada aktivan.',
+    targetApp: 'passenger',
+    showBanner: false,
+  })
   return { ok: true }
 }
 
@@ -105,7 +119,14 @@ export async function login(
   db.currentUserId = user.id
   logActivity(user.id, user.role === 'vozac' ? 'Prijava vozača' : 'Prijava')
   persist()
-  await addNotification(user.id, 'inboxAuth', 'welcomeBack', 'auth')
+  await appendNotification({
+    accountId: user.id,
+    type: 'ACCOUNT_LOGIN',
+    title: 'Nova prijava',
+    body: 'Prijava uspješna. Dobrodošli nazad u UrbanFlow Taxi.',
+    targetApp: user.role === 'vozac' ? 'driver' : 'passenger',
+    showBanner: false,
+  })
   return { ok: true, accountId: user.id, role: user.role }
 }
 
@@ -123,7 +144,14 @@ export async function driverDemoLogin(): Promise<{ ok: true; accountId: string; 
   db.currentUserId = user.id
   logActivity(user.id, 'Prijava vozača')
   persist()
-  await addNotification(user.id, 'inboxAuth', 'driverQuickSignIn', 'auth')
+  await appendNotification({
+    accountId: user.id,
+    type: 'ACCOUNT_LOGIN',
+    title: 'Nova prijava',
+    body: 'Prijava uspješna. Dobrodošli nazad u UrbanFlow Taxi.',
+    targetApp: 'driver',
+    showBanner: false,
+  })
   return { ok: true, accountId: user.id, role: 'vozac' }
 }
 
@@ -136,7 +164,14 @@ export async function googleLogin(): Promise<{ ok: true; accountId: string; role
     db.currentUserId = demo.id
     logActivity(demo.id, 'Google prijava (simulacija)')
     persist()
-    await addNotification(demo.id, 'inboxAuth', 'googleLoginSimOk', 'auth')
+    await appendNotification({
+      accountId: demo.id,
+      type: 'ACCOUNT_LOGIN',
+      title: 'Nova prijava',
+      body: 'Google prijava uspješna. Dobrodošli nazad u UrbanFlow Taxi.',
+      targetApp: demo.role === 'vozac' ? 'driver' : 'passenger',
+      showBanner: false,
+    })
     return { ok: true, accountId: demo.id, role: demo.role }
   }
   const account: UserAccount = {
@@ -159,7 +194,14 @@ export async function googleLogin(): Promise<{ ok: true; accountId: string; role
   })
   db.currentUserId = account.id
   persist()
-  await addNotification(account.id, 'inboxAuth', 'googleAccountCreatedSim', 'auth')
+  await appendNotification({
+    accountId: account.id,
+    type: 'ACCOUNT_LOGIN',
+    title: 'Nova prijava',
+    body: 'Google prijava uspješna. Dobrodošli nazad u UrbanFlow Taxi.',
+    targetApp: 'passenger',
+    showBanner: false,
+  })
   return { ok: true, accountId: account.id, role: account.role }
 }
 
@@ -219,7 +261,14 @@ export async function updateProfile(
     }
     logActivity(accountId, 'Ažuriran profil vozača', 'profile')
     persist()
-    await addNotification(accountId, 'inboxAccount', 'profileUpdated', 'profile')
+    await appendNotification({
+      accountId,
+      type: 'ACCOUNT_UPDATE',
+      title: 'Profil ažuriran',
+      body: 'Vaši podaci su uspješno promijenjeni.',
+      targetApp: 'driver',
+      showBanner: false,
+    })
     return { ok: true }
   }
   const profile = db.profiles.find((p) => p.accountId === accountId)
@@ -230,6 +279,13 @@ export async function updateProfile(
   if (patch.phone) account.phone = patch.phone.trim()
   logActivity(accountId, 'Ažuriran profil', 'profile')
   persist()
-  await addNotification(accountId, 'inboxAccount', 'profileUpdated', 'profile')
+  await appendNotification({
+    accountId,
+    type: 'ACCOUNT_UPDATE',
+    title: 'Profil ažuriran',
+    body: 'Vaši podaci su uspješno promijenjeni.',
+    targetApp: 'passenger',
+    showBanner: false,
+  })
   return { ok: true }
 }

@@ -1,6 +1,5 @@
 import { cloneLocation, createDefaultDriverUi, simpleRoute } from '../data/seed'
-import { strings } from '../i18n/strings'
-import { addNotificationRaw } from './notificationApi'
+import { appendNotification } from './notificationApi'
 import { generateDriverStartNearPickup } from '../utils/driverSim'
 import { fetchRoadRoute } from './routingApi'
 import type {
@@ -100,6 +99,17 @@ export function formatDurationHms(totalSeconds: number): string {
   return `${sec}s`
 }
 
+async function pushNewRideOffer(accountId: string, req: DriverIncomingRequest): Promise<void> {
+  await appendNotification({
+    accountId,
+    type: 'NEW_RIDE_OFFER',
+    title: 'Nova ponuda vožnje',
+    body: `${req.pickup.label} → ${req.destination.label} · ${req.routeDistanceKm.toFixed(1)} km · ~${req.estimatedPrice.toFixed(2)} BAM`,
+    rideId: `offer-${req.id}`,
+    targetApp: 'driver',
+  })
+}
+
 function pushLog(
   accountId: string,
   kind: DriverActivityKind,
@@ -176,6 +186,17 @@ export async function driverStartShift(accountId: string): Promise<{ ok: true } 
     pushLog(accountId, 'zahtjev', 'Novi zahtjev za vožnju primljen.', { zahtjevId: ui.pendingRequest.id })
   }
   persist()
+  await appendNotification({
+    accountId,
+    type: 'SHIFT_STARTED',
+    title: 'Smjena počela',
+    body: 'Uspješno ste počeli smjenu. Sretno!',
+    targetApp: 'driver',
+    showBanner: false,
+  })
+  if (ui.pendingRequest) {
+    await pushNewRideOffer(accountId, ui.pendingRequest)
+  }
   return { ok: true }
 }
 
@@ -187,8 +208,18 @@ export async function driverPause(accountId: string): Promise<{ ok: true } | { e
   }
   ui.availabilityStatus = 'na_pauzi'
   ui.shiftClock.pausesToday += 1
-  if (ui.pendingRequest) {
-    pushLog(accountId, 'zahtjev', 'Zahtjev vraćen sistemu (pauza vozača).', { zahtjevId: ui.pendingRequest.id })
+  const hadPending = ui.pendingRequest
+  if (hadPending) {
+    pushLog(accountId, 'zahtjev', 'Zahtjev vraćen sistemu (pauza vozača).', { zahtjevId: hadPending.id })
+    await appendNotification({
+      accountId,
+      type: 'RIDE_OFFER_EXPIRED',
+      title: 'Ponuda istekla',
+      body: 'Niste prihvatili ponudu na vrijeme',
+      rideId: `offer-${hadPending.id}`,
+      targetApp: 'driver',
+      showBanner: false,
+    })
     ui.pendingRequest = null
   }
   pushLog(accountId, 'status_vozaca', 'Status promijenjen: Pauza.')
@@ -215,6 +246,9 @@ export async function driverResume(accountId: string): Promise<{ ok: true } | { 
     pushLog(accountId, 'zahtjev', 'Novi zahtjev za vožnju primljen.', { zahtjevId: ui.pendingRequest.id })
   }
   persist()
+  if (ui.pendingRequest) {
+    await pushNewRideOffer(accountId, ui.pendingRequest)
+  }
   return { ok: true }
 }
 
@@ -227,6 +261,8 @@ export async function driverEndShift(accountId: string): Promise<{ ok: true } | 
   if (ui.availabilityStatus === 'zauzet') {
     return { error: 'Ne možete završiti smjenu dok ste zauzeti vožnjom.' }
   }
+  const ridesTodaySnapshot = ui.ridesToday
+  const earningsSnapshot = ui.earningsTodayBam
   const endedStart = ui.shiftClock.currentSessionStartedAt
   accumulateActiveSession(ui)
   if (endedStart) ui.shiftClock.lastSessionStartedAt = endedStart
@@ -238,6 +274,25 @@ export async function driverEndShift(accountId: string): Promise<{ ok: true } | 
   if (ui.vehicleUi.status !== 'van_funkcije') ui.vehicleUi.status = 'dostupno'
   pushLog(accountId, 'smjena', 'Smjena završena.')
   persist()
+  const db = getDb()
+  const dp = db.driverProfiles.find((p) => p.accountId === accountId)
+  const ratingStr = dp ? dp.rating.toFixed(1) : '—'
+  await appendNotification({
+    accountId,
+    type: 'SHIFT_ENDED',
+    title: 'Smjena završena',
+    body: 'Završili ste smjenu.',
+    targetApp: 'driver',
+    showBanner: false,
+  })
+  await appendNotification({
+    accountId,
+    type: 'EARNINGS_SUMMARY',
+    title: 'Zarada za smjenu',
+    body: `${ridesTodaySnapshot} vožnji · Ukupno: ${earningsSnapshot.toFixed(2)} BAM · Prosječna ocjena: ${ratingStr}`,
+    targetApp: 'driver',
+    showBanner: false,
+  })
   return { ok: true }
 }
 
@@ -313,6 +368,7 @@ export async function scheduleNewRequestAfterReject(accountId: string, ms = 3200
     ui.pendingRequest = buildTemplateRideRequest()
     pushLog(accountId, 'zahtjev', 'Novi zahtjev dodijeljen nakon odbijanja.', { zahtjevId: ui.pendingRequest.id })
     persist()
+    await pushNewRideOffer(accountId, ui.pendingRequest)
   }
 }
 
@@ -469,16 +525,19 @@ export async function driverCompleteRide(accountId: string): Promise<
   }
   persist()
 
-  const msg = strings()
-  const d = msg.driver
-  const nTitle = msg.notifications.driverRideSummaryTitle
-  const nBody = [
-    `${d.rideSummaryRoute}: ${routeLabel}`,
-    `${d.rideSummaryPrice}: ${ride.estimatedPrice.toFixed(2)} BAM`,
-    `${d.rideSummaryDuration}: ${durationMin} min`,
-    `${d.rideSummaryPayment}: ${ride.paymentMethod}`,
-  ].join('\n')
-  await addNotificationRaw(accountId, nTitle, nBody, 'driverRideSummary')
+  await appendNotification({
+    accountId,
+    type: 'SYSTEM_MESSAGE',
+    title: 'Vožnja završena',
+    body: `${routeLabel} · ${ride.estimatedPrice.toFixed(2)} BAM · ${durationMin} min`,
+    rideId: ride.id,
+    targetApp: 'driver',
+    showBanner: false,
+  })
+
+  if (ui.pendingRequest) {
+    await pushNewRideOffer(accountId, ui.pendingRequest)
+  }
 
   return {
     ok: true,
@@ -528,6 +587,30 @@ export async function driverCancelActiveRide(
   if (ui.vehicleUi.status !== 'van_funkcije') ui.vehicleUi.status = 'dostupno'
   pushLog(accountId, 'vožnja', `Vožnja otkazana: ${reason}`, { vožnjaId: ride.id })
   persist()
+  const db = getDb()
+  const dp = db.driverProfiles.find((p) => p.accountId === accountId)
+  if (dp) {
+    const match = db.rides.find(
+      (r) =>
+        r.driverId === dp.linkedDriverId &&
+        r.pickup.label === ride.pickup.label &&
+        r.destination.label === ride.destination.label &&
+        ['dodijeljena', 'vozac_na_putu', 'stigao'].includes(r.status)
+    )
+    if (match) {
+      const pAcc = db.profiles.find((p) => p.id === match.passengerId)?.accountId
+      if (pAcc) {
+        await appendNotification({
+          accountId: pAcc,
+          type: 'RIDE_CANCELLED_BY_DRIVER',
+          title: 'Vožnja otkazana',
+          body: 'Vozač je otkazao vožnju. Tražimo novog vozača...',
+          rideId: match.id,
+          targetApp: 'passenger',
+        })
+      }
+    }
+  }
   return { ok: true }
 }
 

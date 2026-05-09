@@ -1,27 +1,39 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
-import { useState } from 'react'
+import { useMarkAllNotificationsReadWhenPanelOpen } from '../../hooks/useMarkAllNotificationsReadWhenPanelOpen'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { strings } from '../../i18n/strings'
+import { notificationDeepLink, type AppRole } from '../../lib/notificationDeepLink'
 import { cn } from '../../lib/utils'
 import {
   deleteAllNotifications,
+  deleteNotification,
   getNotifications,
   markAllRead,
   markNotificationRead,
 } from '../../services/notificationApi'
+import {
+  NotificationBottomSheet,
+  NotificationSheetDeleteAllButton,
+  NotificationSheetMarkAllReadButton,
+} from '../notifications/NotificationBottomSheet'
 import { NotificationDropdownList } from '../notifications/NotificationDropdownList'
 
 export function MobileFloatingNotifications({
   accountId,
+  appRole,
   hidden,
   layout = 'default',
 }: {
   accountId: string
+  appRole: AppRole
   hidden?: boolean
   /** `orderMap`: top-right overlay aligned with safe area (passenger order / map screen). */
   layout?: 'default' | 'orderMap'
 }) {
   const t = strings()
+  const navigate = useNavigate()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
   const { data: notifications = [] } = useQuery({
@@ -29,6 +41,16 @@ export function MobileFloatingNotifications({
     queryFn: () => getNotifications(accountId),
   })
   const unread = notifications.filter((n) => !n.read).length
+  useMarkAllNotificationsReadWhenPanelOpen(open, accountId, unread)
+
+  useEffect(() => {
+    if (!open) return
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onEsc)
+    return () => document.removeEventListener('keydown', onEsc)
+  }, [open])
 
   if (hidden) return null
 
@@ -52,53 +74,55 @@ export function MobileFloatingNotifications({
       >
         <Bell className="h-5 w-5" />
         {unread > 0 ? (
-          <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border border-white bg-brand-danger" />
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[18px] items-center justify-center rounded-full bg-emerald-500 px-0.5 text-[10px] font-bold leading-none text-white ring-2 ring-white">
+            {unread > 9 ? '9+' : unread}
+          </span>
         ) : null}
       </button>
-      {open ? (
-        <div className="absolute right-0 top-full mt-2 w-[min(88vw,22rem)] rounded-2xl border border-slate-200/80 bg-white p-2 shadow-[0_10px_28px_rgba(15,23,42,0.12)]">
-          <span className="pointer-events-none absolute -top-1.5 right-4 h-3 w-3 rotate-45 border-l border-t border-slate-200/80 bg-white" aria-hidden />
-          <div className="flex items-center justify-between gap-2 px-2 pb-2">
-            <p className="text-xs font-semibold text-slate-500">{t.notifications.bell}</p>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="text-[11px] font-semibold text-brand-teal hover:text-brand-teal disabled:opacity-40"
-                disabled={unread === 0}
-                onClick={async () => {
-                  await markAllRead(accountId)
-                  await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
-                }}
-              >
-                {t.notifications.markAllRead}
-              </button>
-              <button
-                type="button"
-                className="text-[11px] font-semibold text-[#EF4444] hover:text-[#DC2626] disabled:opacity-40"
-                disabled={notifications.length === 0}
-                onClick={async () => {
-                  await deleteAllNotifications(accountId)
-                  await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
-                  setOpen(false)
-                }}
-              >
-                {t.notifications.deleteAll}
-              </button>
-            </div>
-          </div>
-          <ul className="max-h-72 space-y-1 overflow-y-auto">
-            <NotificationDropdownList
-              notifications={notifications}
-              t={t}
-              maxItems={20}
-              onItemActivate={async (n) => {
-                await markNotificationRead(n.id, accountId)
+      <NotificationBottomSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        headerActions={
+          <>
+            <NotificationSheetMarkAllReadButton
+              disabled={unread === 0}
+              onClick={async () => {
+                await markAllRead(accountId)
                 await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
               }}
-            />
-          </ul>
-        </div>
-      ) : null}
+            >
+              Pročitaj sve
+            </NotificationSheetMarkAllReadButton>
+            <NotificationSheetDeleteAllButton
+              disabled={notifications.length === 0}
+              onClick={async () => {
+                await deleteAllNotifications(accountId)
+                await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+                setOpen(false)
+              }}
+            >
+              Obriši sve
+            </NotificationSheetDeleteAllButton>
+          </>
+        }
+      >
+        <ul className="flex-1 overflow-y-auto pb-3">
+          <NotificationDropdownList
+            notifications={notifications}
+            t={t}
+            onItemActivate={async (n) => {
+              await markNotificationRead(n.id, accountId)
+              await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+              navigate(notificationDeepLink(n, appRole))
+              setOpen(false)
+            }}
+            onItemDelete={async (n) => {
+              await deleteNotification(n.id, accountId)
+              await qc.invalidateQueries({ queryKey: ['notifications', accountId] })
+            }}
+          />
+        </ul>
+      </NotificationBottomSheet>
     </div>
   )
 }

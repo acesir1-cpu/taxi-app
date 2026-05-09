@@ -27,9 +27,11 @@ import { TextAreaField } from '../components/settings/TextAreaField'
 import { ToggleRow } from '../components/settings/ToggleRow'
 import { validateAccountProfile } from '../lib/accountProfileValidation'
 import {
+  loadPassengerLocationPrefs,
   loadPassengerNotifyPrefs,
   loadPassengerPersonalize,
   loadPassengerProfileExtras,
+  savePassengerLocationPrefs,
   savePassengerNotifyPrefs,
   savePassengerPersonalize,
   savePassengerProfileExtras,
@@ -93,7 +95,10 @@ export function ProfilePage() {
   const [twoFaEnabled, setTwoFaEnabled] = useState(false)
   const [notifyPrefs, setNotifyPrefs] = useState(() => loadPassengerNotifyPrefs(me.account.id))
   const historyPrefs = getHistoryPrivacyPrefs(me.account.id)
-  const [locationPrefs, setLocationPrefs] = useState({ gps: true, saveHistory: historyPrefs.saveHistory })
+  const [locationPrefs, setLocationPrefs] = useState(() => {
+    const gpsPrefs = loadPassengerLocationPrefs(me.account.id)
+    return { gps: gpsPrefs.gps, gpsPromptSeen: gpsPrefs.gpsPromptSeen, saveHistory: historyPrefs.saveHistory }
+  })
   const [defaultRideType, setDefaultRideType] = useState<'odmah' | 'zakazi'>(() => loadPassengerPersonalize(me.account.id).defaultRideType)
   const [supportModal, setSupportModal] = useState(false)
   const [faqModal, setFaqModal] = useState(false)
@@ -133,6 +138,8 @@ export function ProfilePage() {
       appLang: (pers.appLang ?? getGuestLang()) as 'bs' | 'en',
     })
     setNotifyPrefs(loadPassengerNotifyPrefs(me.account.id))
+    const gpsPrefs = loadPassengerLocationPrefs(me.account.id)
+    setLocationPrefs((prev) => ({ ...prev, gps: gpsPrefs.gps, gpsPromptSeen: gpsPrefs.gpsPromptSeen }))
     setDefaultRideType(pers.defaultRideType)
     setProfilePhoto(ex.avatarDataUrl ?? '')
     if (ex.savedLocations) {
@@ -571,7 +578,14 @@ export function ProfilePage() {
               title={tr('Koristi GPS lokaciju', 'Use GPS location')}
               description={tr('Omogućava brže postavljanje polazišta i preciznije procjene.', 'Enables faster pickup setup and more accurate estimates.')}
               enabled={locationPrefs.gps}
-              onChange={(v) => setLocationPrefs((prev) => ({ ...prev, gps: v }))}
+              onChange={(v) => {
+                const next = { ...locationPrefs, gps: v, gpsPromptSeen: true }
+                setLocationPrefs(next)
+                savePassengerLocationPrefs(me.account.id, {
+                  gps: next.gps,
+                  gpsPromptSeen: next.gpsPromptSeen,
+                })
+              }}
             />
             {!locationPrefs.gps ? (
               <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">

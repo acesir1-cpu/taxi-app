@@ -56,8 +56,8 @@ export function VerifyPage() {
           transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
           className="mx-auto w-full max-w-lg"
         >
-          <AuthCard title={t.brand} subtitle={t.auth.verifyTitle}>
-            <p className="text-sm text-stone-400">{t.auth.verifyContinueRegistration}</p>
+          <AuthCard title={t.brand} subtitle={t.auth.verifyTitle} variant="light">
+            <p className="text-sm text-slate-600">{t.auth.verifyContinueRegistration}</p>
             <Button className="mt-4 w-full" onClick={() => navigate('/register')}>
               {t.welcome.register}
             </Button>
@@ -75,9 +75,9 @@ export function VerifyPage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto w-full max-w-lg"
       >
-        <AuthCard title={t.brand} subtitle={t.auth.verifyTitle}>
+        <AuthCard title={t.brand} subtitle={t.auth.verifyTitle} variant="light">
           <div className="space-y-4">
-            <p className="-mt-1 text-sm text-center text-stone-300">{t.auth.verifyHint}</p>
+            <p className="-mt-1 text-center text-sm text-slate-600">{t.auth.verifyHint}</p>
             <div>
               <label className="sr-only" htmlFor="code">
                 {t.auth.verifyCodeLabel}
@@ -92,29 +92,24 @@ export function VerifyPage() {
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 className="text-center text-2xl tracking-[0.4em] font-semibold"
               />
-              <p className="mt-2 text-xs text-stone-500">{t.auth.verifyDemoCode}</p>
+              <p className="mt-2 text-xs text-slate-500">{t.auth.verifyDemoCode}</p>
             </div>
             <Button className="w-full" disabled={code.length !== 6 || mut.isPending} onClick={() => mut.mutate()}>
               {mut.isPending ? t.common.loading : t.auth.verifySubmit}
             </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              className="w-full border-2 border-white/30 bg-white/[0.05] text-stone-100 hover:bg-white/[0.12] hover:text-white"
-              onClick={() => push(strings().auth.codeSent, 'info')}
-            >
+            <Button type="button" variant="secondary" className="w-full" onClick={() => push(strings().auth.codeSent, 'info')}>
               {t.auth.resend}
             </Button>
-            <nav className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-1 text-xs text-stone-500">
-              <Link to="/privacy" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
+            <nav className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5 pt-1 text-xs text-slate-500">
+              <Link to="/privacy" className="font-medium text-slate-500 transition-colors hover:text-brand-navy hover:underline">
                 {t.welcome.privacy}
               </Link>
-              <span className="select-none text-stone-600">·</span>
-              <Link to="/terms" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
+              <span className="select-none text-slate-400">·</span>
+              <Link to="/terms" className="font-medium text-slate-500 transition-colors hover:text-brand-navy hover:underline">
                 {t.welcome.terms}
               </Link>
-              <span className="select-none text-stone-600">·</span>
-              <Link to="/support" className="font-medium text-stone-400 transition-colors hover:text-stone-200 hover:underline">
+              <span className="select-none text-slate-400">·</span>
+              <Link to="/support" className="font-medium text-slate-500 transition-colors hover:text-brand-navy hover:underline">
                 {t.welcome.support}
               </Link>
             </nav>

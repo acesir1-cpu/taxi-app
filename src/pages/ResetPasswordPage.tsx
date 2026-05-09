@@ -21,10 +21,10 @@ export function ResetPasswordPage() {
         transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
         className="mx-auto w-full max-w-lg"
       >
-        <AuthCard title={t.auth.resetPasswordTitle} subtitle={t.auth.resetPasswordSubtitle}>
+        <AuthCard title={t.auth.resetPasswordTitle} subtitle={t.auth.resetPasswordSubtitle} variant="light">
           <div className="space-y-3">
             <div className="space-y-1.5 text-left">
-              <p className="text-sm text-stone-300">{t.auth.email}</p>
+              <p className="text-sm text-slate-600">{t.auth.email}</p>
               <Input
                 type="email"
                 value={email}
@@ -45,7 +45,7 @@ export function ResetPasswordPage() {
             >
               {t.auth.resetPasswordSend}
             </Button>
-            <Link to="/login" className="block pt-1 text-center text-sm font-medium text-stone-300 hover:text-white hover:underline">
+            <Link to="/login" className="block pt-1 text-center text-sm font-medium text-brand-teal hover:underline">
               {t.auth.backToLogin}
             </Link>
           </div>

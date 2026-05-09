@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import { useMe } from '../../hooks/useMe'
@@ -17,6 +18,13 @@ export function AppShell() {
   const { data: me, isLoading } = useMe()
   const { data: active } = useActiveRide(me?.kind === 'passenger' ? me.profile.id : undefined)
 
+  useEffect(() => {
+    document.body.classList.add('app-mobile-nav')
+    return () => {
+      document.body.classList.remove('app-mobile-nav')
+    }
+  }, [])
+
   if (isLoading || !me || me.kind !== 'passenger') {
     return (
       <div className="app-shell-atmosphere min-h-screen">
@@ -27,6 +35,8 @@ export function AppShell() {
 
   const name = `${me.profile.firstName} ${me.profile.lastName}`
   const isOnActiveRideScreen = location.pathname === '/app/active' || location.pathname.startsWith('/app/ride/')
+  /** Match confirmation lives on SearchingPage; banner would duplicate “go to ride” before user confirms. */
+  const isOnSearching = location.pathname === '/app/searching'
   const hideMobileBell = location.pathname === '/app/profile'
   const orderMapMobileLayout = location.pathname === '/app/order'
   const rideMapMobileLayout = isOnActiveRideScreen
@@ -41,6 +51,7 @@ export function AppShell() {
       <TopBar accountId={me.account.id} name={name} />
       <MobileFloatingNotifications
         accountId={me.account.id}
+        appRole="passenger"
         hidden={hideMobileBell}
         layout={orderMapMobileLayout || rideMapMobileLayout ? 'orderMap' : 'default'}
       />
@@ -50,7 +61,7 @@ export function AppShell() {
           (orderMapMobileLayout || rideMapMobileLayout) && 'max-lg:gap-0 max-lg:px-0 max-lg:py-0'
         )}
       >
-        {active && !isOnActiveRideScreen ? (
+        {active && !isOnActiveRideScreen && !isOnSearching ? (
           <div className={cn((orderMapMobileLayout || rideMapMobileLayout) && 'relative z-[62]')}>
             <ActiveRideBanner rideId={active.id} />
           </div>

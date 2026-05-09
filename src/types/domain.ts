@@ -385,21 +385,7 @@ export interface ActivityLog {
   newValue?: string
 }
 
-/** Ključevi za naslov/tijelo obavještenja — tekst se čita iz `strings().notifications` pri prikazu. */
-export type NotificationI18nKey = keyof import('../i18n/strings').AppMessages['notifications']
-
-export interface AppNotification {
-  id: string
-  accountId: string
-  read: boolean
-  createdAt: string
-  type: string
-  titleKey?: NotificationI18nKey
-  bodyKey?: NotificationI18nKey
-  /** Zastarjelo: ako nema titleKey/bodyKey (stari podaci), prikazuje se ovaj tekst. */
-  title?: string
-  body?: string
-}
+export type { AppNotification } from './notifications'
 
 export interface RouteEstimate {
   distanceKm: number
@@ -437,7 +423,7 @@ export interface MockDatabase {
   ratings: Rating[]
   complaints: Complaint[]
   activityLogs: ActivityLog[]
-  notifications: AppNotification[]
+  notifications: import('./notifications').AppNotification[]
   currentUserId: string | null
   /** Emails/phones pending verification */
   pendingVerificationAccountIds: string[]
