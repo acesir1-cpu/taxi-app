@@ -17,7 +17,6 @@ import {
   requestNewDriverForRide,
   setRideStatus,
 } from '../services/rideApi'
-import { SHOW_DEMO } from '../lib/showDemo'
 import { LoadingState } from '../components/common/LoadingState'
 import { getDb } from '../services/mockDb'
 import { useNotificationBannerStore } from '../store/notificationBannerStore'
@@ -229,11 +228,10 @@ export function SearchingPage() {
   const t = strings()
   const { me } = useOutletContext<AppOutletContext>()
   const navigate = useNavigate()
-  const location = useLocation() as { state?: { requestId?: string; forceNoDriversDemo?: boolean } }
+  const location = useLocation() as { state?: { requestId?: string } }
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
   const requestId = location.state?.requestId ?? getStoredSearchRequestId()
-  const forceNoDriversDemo = SHOW_DEMO && location.state?.forceNoDriversDemo === true
   const [checked, setChecked] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [rideSearchPhase, setRideSearchPhase] = useState<RideSearchPhase>('IDLE')
@@ -243,7 +241,6 @@ export function SearchingPage() {
   const [foundVehicle, setFoundVehicle] = useState<Vehicle | null>(null)
   const [actionBusy, setActionBusy] = useState<'confirm' | 'new_driver' | null>(null)
   const [confirmMsLeft, setConfirmMsLeft] = useState(MATCH_CONFIRM_MS)
-  const demoTimeoutSec = 9
   const isMatchSheetMobile = useMatchSheetMobile()
 
   const candidates = useMemo(() => getDb().drivers.slice(0, 4), [])
@@ -291,14 +288,7 @@ export function SearchingPage() {
       }
       setStoredSearchRequestId(requestId)
       setRideSearchPhase('SEARCHING')
-      const res = forceNoDriversDemo
-        ? await Promise.race([
-            assignDriver(requestId, me.account.id, { forceNoDrivers: true }),
-            new Promise<{ error: 'no_drivers' }>((resolve) =>
-              window.setTimeout(() => resolve({ error: 'no_drivers' }), demoTimeoutSec * 1000)
-            ),
-          ])
-        : await assignDriver(requestId, me.account.id, { forceNoDrivers: false })
+      const res = await assignDriver(requestId, me.account.id, { forceNoDrivers: false })
       if (!alive) return
       if ('error' in res) {
         clearStoredSearchRequestId()
@@ -325,7 +315,7 @@ export function SearchingPage() {
     return () => {
       alive = false
     }
-  }, [demoTimeoutSec, forceNoDriversDemo, me.account.id, me.profile.id, navigate, push, requestId])
+  }, [me.account.id, me.profile.id, navigate, push, requestId])
 
   useEffect(() => {
     if (!loading || rideSearchPhase !== 'SEARCHING') return
@@ -456,9 +446,7 @@ export function SearchingPage() {
             ) : null}
             {rideSearchPhase === 'SEARCHING' && !showFoundModal ? (
               <p className="mt-1 text-xs font-semibold text-slate-500">
-                {forceNoDriversDemo
-                  ? t.order.demoCountdown.replace('{seconds}', String(Math.max(0, demoTimeoutSec - secondsWaiting)).padStart(2, '0'))
-                  : t.order.waitingTime.replace('{seconds}', String(secondsWaiting).padStart(2, '0'))}
+                {t.order.waitingTime.replace('{seconds}', String(secondsWaiting).padStart(2, '0'))}
               </p>
             ) : null}
           </div>

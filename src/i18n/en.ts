@@ -4,7 +4,7 @@ export const en = {
   welcome: {
     title: 'Your ride, simplified.',
     subtitle: 'Order a taxi in Sarajevo in seconds. Safe, fast, affordable.',
-    trustSignal: '⭐ 4.8 | 10k+ rides',
+    trustSignal: '⭐ 4.8 · 10k+ rides',
     orDivider: 'or',
     loginHelper: 'Quick and simple',
     locationTag: 'Sarajevo',
@@ -166,6 +166,13 @@ export const en = {
     scheduledEmptyTitle: 'You have no scheduled rides',
     scheduledEmptyHint: 'Plan your ride in advance and it will appear here.',
     editScheduledRide: 'Edit scheduled ride',
+    scheduledRequestStatus: {
+      kreiran: 'Planned',
+      u_obradi: 'Finding a driver',
+      dodijeljen: 'Driver assigned',
+      otkazan: 'Cancelled',
+      neuspjesan: 'Could not assign',
+    },
     activeExists: 'You already have an active ride.',
     sameLoc: 'Pickup and drop-off cannot be the same.',
     needRoute: 'Calculate the route before confirming.',
@@ -224,8 +231,6 @@ export const en = {
     driversNearbyFluctuationBanner: 'No drivers nearby at the moment. Try again in a few minutes.',
     locationOptionalHint: 'Turn on browser location for a more accurate count (optional).',
     weatherContext: 'Context helps decision-making. Rain means users order more often. Driver availability builds trust.',
-    demoNoDriverToggle: 'Demo: simulate a case where no driver can be found.',
-    demoCountdown: 'Demo countdown: {seconds}s',
     waitingTime: 'Waiting time: {seconds}s',
   },
   ride: {

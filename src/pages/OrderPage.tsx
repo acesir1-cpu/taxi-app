@@ -15,7 +15,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Car,
-  ChevronDown,
   ChevronRight,
   CloudSun,
   Crosshair,
@@ -26,7 +25,6 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { demoGlassPanelClass } from '../lib/demoGlassPanel'
 import { cn } from '../lib/utils'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
@@ -74,7 +72,6 @@ import {
   SARAJEVO_CENTER_FALLBACK,
 } from '../lib/driverZonesSimulation'
 import { getDb } from '../services/mockDb'
-import { SHOW_DEMO } from '../lib/showDemo'
 import { useLiveClock } from '../hooks/useLiveClock'
 
 type MobileLocMethod = 'map' | 'address' | null
@@ -145,7 +142,6 @@ export function OrderPage() {
   const [mobilePickupMethod, setMobilePickupMethod] = useState<MobileLocMethod>(null)
   const [mobileDestMethod, setMobileDestMethod] = useState<MobileLocMethod>(null)
   const [showMobileMapHint, setShowMobileMapHint] = useState(false)
-  const [demoControlsOpen, setDemoControlsOpen] = useState(false)
   const [mobileSheetExpanded, setMobileSheetExpanded] = useState(true)
   const [mobileViewportHeight, setMobileViewportHeight] = useState(
     () => (typeof window !== 'undefined' ? window.innerHeight : 800)
@@ -170,7 +166,6 @@ export function OrderPage() {
   const isMobileFlow = useIsMobileOrderFlow()
   const [sameLocationError, setSameLocationError] = useState(false)
   const [scheduleInputError, setScheduleInputError] = useState(false)
-  const [demoNoDriverMode, setDemoNoDriverMode] = useState(false)
   const historyPrefs = getHistoryPrivacyPrefs(me.account.id)
   const profileExtras = useMemo(() => loadPassengerProfileExtras(me.account.id), [me.account.id])
   const [locationPrefs, setLocationPrefs] = useState<PassengerLocationPrefsState>(() =>
@@ -385,10 +380,6 @@ export function OrderPage() {
   }, [driversFluctuationBanner])
 
   useEffect(() => {
-    if (!SHOW_DEMO) setDemoNoDriverMode(false)
-  }, [])
-
-  useEffect(() => {
     let alive = true
     let raw: string | null = null
     try {
@@ -520,7 +511,7 @@ export function OrderPage() {
         // ignore storage issues in private mode
       }
       navigate('/app/searching', {
-        state: { requestId: res.request.id, forceNoDriversDemo: SHOW_DEMO && demoNoDriverMode },
+        state: { requestId: res.request.id },
         replace: false,
       })
     },
@@ -556,7 +547,6 @@ export function OrderPage() {
     setMobileDestMethod(null)
     setMapOverlayDismissed(false)
     setSameLocationError(false)
-    setDemoNoDriverMode(false)
     void qc.invalidateQueries({ queryKey: ['routePreview'] })
   }
 
@@ -1447,36 +1437,6 @@ export function OrderPage() {
                     </div>
                   ) : null}
                   <div className="pt-0.5">
-                    <div className={cn(demoGlassPanelClass, 'mb-2 px-3 py-2')}>
-                      <button
-                        type="button"
-                        className="flex w-full items-center justify-between gap-2 text-left"
-                        onClick={() => setDemoControlsOpen((prev) => !prev)}
-                        aria-expanded={demoControlsOpen}
-                      >
-                        <span className="block text-[9px] font-bold uppercase tracking-wide text-brand-yellow">
-                          {t.common.demoControls}
-                        </span>
-                        <ChevronDown
-                          className={cn(
-                            'h-3.5 w-3.5 text-slate-500 transition-transform duration-200',
-                            demoControlsOpen && 'rotate-180'
-                          )}
-                          aria-hidden
-                        />
-                      </button>
-                      {demoControlsOpen ? (
-                        <label className="mt-1.5 flex cursor-pointer items-start gap-2 text-[11px] text-slate-700">
-                          <input
-                            type="checkbox"
-                            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-brand-yellow"
-                            checked={demoNoDriverMode}
-                            onChange={(e) => setDemoNoDriverMode(e.target.checked)}
-                          />
-                          <span className="mt-0.5 block leading-snug">{t.order.demoNoDriverToggle}</span>
-                        </label>
-                      ) : null}
-                    </div>
                     <Button
                       type="button"
                       variant="ghost"
@@ -1620,11 +1580,7 @@ export function OrderPage() {
                         onClick: reset,
                         ariaLabel: t.order.reset,
                         visible: Boolean(
-                          pickup ||
-                            destination ||
-                            scheduledLocal ||
-                            orderType === 'zakazano' ||
-                            demoNoDriverMode
+                          pickup || destination || scheduledLocal || orderType === 'zakazano'
                         ),
                       }}
                       rightAction={
@@ -1702,36 +1658,6 @@ export function OrderPage() {
                     </div>
                   </div>
                 ) : null}
-                <div className={cn(demoGlassPanelClass, 'px-3 py-2')}>
-                  <button
-                    type="button"
-                    className="flex w-full items-center justify-between gap-2 text-left"
-                    onClick={() => setDemoControlsOpen((prev) => !prev)}
-                    aria-expanded={demoControlsOpen}
-                  >
-                    <span className="block text-[10px] font-bold uppercase tracking-wide text-brand-yellow">
-                      {t.common.demoControls}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        'h-3.5 w-3.5 text-slate-500 transition-transform duration-200',
-                        demoControlsOpen && 'rotate-180'
-                      )}
-                      aria-hidden
-                    />
-                  </button>
-                  {demoControlsOpen ? (
-                    <label className="mt-1.5 flex cursor-pointer items-start gap-2 text-[11px] text-slate-700">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-brand-yellow"
-                        checked={demoNoDriverMode}
-                        onChange={(e) => setDemoNoDriverMode(e.target.checked)}
-                      />
-                      <span className="mt-0.5 block leading-snug">{t.order.demoNoDriverToggle}</span>
-                    </label>
-                  ) : null}
-                </div>
                 {sameLocationError ? <p className="text-xs font-medium text-brand-danger">{t.order.sameLoc}</p> : null}
                 {!hasBothLocations ? (
                   <p className="text-xs font-medium text-slate-700">

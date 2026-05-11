@@ -72,7 +72,9 @@ export function AuthHeroPanel({ className }: { className?: string }) {
         </ul>
 
         {/* Social proof */}
-        <p className="mt-8 text-[13px] font-semibold text-white/95 md:mt-10">{wc.socialProof}</p>
+        <p className="mt-8 text-[16px] font-semibold leading-snug text-white/95 md:mt-10 md:text-[18px]">
+          {wc.socialProof}
+        </p>
       </div>
     </aside>
   )

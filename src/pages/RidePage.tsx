@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { motion } from 'framer-motion'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
-import { demoGlassDividerClass, demoGlassPanelClass } from '../lib/demoGlassPanel'
 import { cn } from '../lib/utils'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
@@ -18,11 +16,9 @@ import {
   getDriverById,
   getRideById,
   getVehicleById,
-  resetAllDriversAvailable,
   setRideStatus,
   updateDriverSimPosition,
 } from '../services/rideApi'
-import { resetDb } from '../services/mockDb'
 import { useDriverSimStore } from '../store/driverSimStore'
 import { useToastStore } from '../store/notificationStore'
 import { MapChunkFallback } from '../components/map/MapChunkFallback'
@@ -58,11 +54,8 @@ export function RidePage() {
   const push = useToastStore((s) => s.push)
   const isMobileRide = useIsMobileRideLayout()
   const simSpeed = useDriverSimStore((s) => s.simSpeed)
-  const setSimSpeed = useDriverSimStore((s) => s.setSimSpeed)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
-  const [demoOpen, setDemoOpen] = useState(true)
-  const [forcePending, setForcePending] = useState(false)
   const [followTaxi, setFollowTaxi] = useState(true)
   const [showArrivalPopup, setShowArrivalPopup] = useState(false)
   const [driverPosSim, setDriverPosSim] = useState<{ lat: number; lng: number } | null>(null)
@@ -239,49 +232,6 @@ export function RidePage() {
       }
     }
   }, [rideId])
-
-  function runDemoStatus(next: RideStatus) {
-    void (async () => {
-      if (!rideId || !ride || forcePending) return
-      setForcePending(true)
-      setShowArrivalPopup(false)
-      try {
-        if (next === 'vozac_na_putu') {
-          const origin = driverOriginRef.current ?? {
-            lat: ride.driverLat ?? ride.pickup.lat,
-            lng: ride.driverLng ?? ride.pickup.lng,
-          }
-          setDriverPosSim(origin)
-          await updateDriverSimPosition(rideId, origin.lat, origin.lng)
-          await setRideStatusSafe('vozac_na_putu')
-          return
-        }
-        if (next === 'stigao') {
-          stopSimulationRun()
-          setDriverPosSim({ lat: ride.pickup.lat, lng: ride.pickup.lng })
-          await updateDriverSimPosition(rideId, ride.pickup.lat, ride.pickup.lng)
-          const ok = await setRideStatusSafe('stigao')
-          if (ok) setShowArrivalPopup(true)
-          return
-        }
-        if (next === 'u_toku') {
-          stopSimulationRun()
-          setDriverPosSim({ lat: ride.pickup.lat, lng: ride.pickup.lng })
-          await updateDriverSimPosition(rideId, ride.pickup.lat, ride.pickup.lng)
-          await setRideStatusSafe('u_toku')
-          return
-        }
-        if (next === 'zavrsena') {
-          stopSimulationRun()
-          setDriverPosSim({ lat: ride.destination.lat, lng: ride.destination.lng })
-          await updateDriverSimPosition(rideId, ride.destination.lat, ride.destination.lng)
-          await setRideStatusSafe('zavrsena')
-        }
-      } finally {
-        setForcePending(false)
-      }
-    })()
-  }
 
   useEffect(() => {
     if (!rideId || status !== 'dodijeljena' || !rideRef.current) return
@@ -484,162 +434,6 @@ export function RidePage() {
     </div>
   )
 
-  const demoPanel = (
-    <motion.div layout className={demoGlassPanelClass}>
-        <button
-          type="button"
-          className="flex w-full items-center justify-between gap-2 text-left"
-          onClick={() => setDemoOpen((v) => !v)}
-        >
-          <span className="text-xs font-bold uppercase tracking-wide text-brand-yellow">{t.common.demoControls}</span>
-          <span className="text-lg font-light leading-none text-brand-navy tabular-nums">{demoOpen ? '−' : '+'}</span>
-        </button>
-        {demoOpen ? (
-          <div className={cn('mt-3 space-y-3', demoGlassDividerClass)}>
-            <p className="text-xs text-slate-600">
-              <span className="font-semibold text-brand-navy">{t.common.demoSpeedLabel}:</span>{' '}
-              <span className="font-extrabold text-brand-navy">{simSpeed}x</span>
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className={
-                  simSpeed === 1
-                    ? 'border-2 border-brand-yellow/50 bg-brand-yellow/10 text-brand-navy hover:bg-brand-yellow/15'
-                    : 'border-slate-200 hover:border-brand-yellow/40'
-                }
-                disabled={simSpeed === 1}
-                onClick={() => setSimSpeed(1)}
-              >
-                1x
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className={
-                  simSpeed === 2
-                    ? 'border-2 border-brand-yellow/50 bg-brand-yellow/10 text-brand-navy hover:bg-brand-yellow/15'
-                    : 'border-slate-200 hover:border-brand-yellow/40'
-                }
-                disabled={simSpeed === 2}
-                onClick={() => setSimSpeed(2)}
-              >
-                2x
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className={
-                  simSpeed === 4
-                    ? 'border-2 border-brand-yellow/50 bg-brand-yellow/10 text-brand-navy hover:bg-brand-yellow/15'
-                    : 'border-slate-200 hover:border-brand-yellow/40'
-                }
-                disabled={simSpeed === 4}
-                onClick={() => setSimSpeed(4)}
-              >
-                4x
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className={
-                  simSpeed === 10
-                    ? 'border-2 border-brand-yellow/50 bg-brand-yellow/10 text-brand-navy hover:bg-brand-yellow/15'
-                    : 'border-slate-200 hover:border-brand-yellow/40'
-                }
-                disabled={simSpeed === 10}
-                onClick={() => setSimSpeed(10)}
-              >
-                10x
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className="border-slate-200 hover:border-brand-yellow/45 hover:bg-brand-yellow/5"
-                disabled={!rideId || forcePending}
-                onClick={() => runDemoStatus('vozac_na_putu')}
-              >
-                {t.common.forceDriverWay}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className="border-slate-200 hover:border-brand-yellow/45 hover:bg-brand-yellow/5"
-                disabled={!rideId || forcePending}
-                onClick={() => runDemoStatus('stigao')}
-              >
-                {t.common.forceArrived}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className="border-slate-200 hover:border-brand-yellow/45 hover:bg-brand-yellow/5"
-                disabled={!rideId || forcePending}
-                onClick={() => runDemoStatus('u_toku')}
-              >
-                {t.common.forceStartRide}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className="border-slate-200 hover:border-brand-yellow/45 hover:bg-brand-yellow/5"
-                disabled={!rideId || forcePending}
-                onClick={() => runDemoStatus('zavrsena')}
-              >
-                {t.common.forceComplete}
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                type="button"
-                className="border-2 border-red-200 text-red-700 hover:bg-red-50"
-                onClick={() => {
-                  void (async () => {
-                    stopSimulationRun()
-                    setShowArrivalPopup(false)
-                    setSimSpeed(1)
-                    if (rideId && driverOriginRef.current) {
-                      const newStart = ride ? generateDriverStartNearPickup(ride.pickup) : driverOriginRef.current
-                      driverOriginRef.current = newStart
-                      setDriverOriginState(newStart)
-                      setDriverPosSim(newStart)
-                      setDriverStartDistanceKm(ride ? haversineKm(newStart, ride.pickup) : null)
-                      await updateDriverSimPosition(
-                        rideId,
-                        newStart.lat,
-                        newStart.lng
-                      )
-                      await setRideStatusSafe('dodijeljena')
-                    } else {
-                      await resetAllDriversAvailable()
-                      resetDb()
-                      await qc.invalidateQueries()
-                    }
-                    push(strings().common.demoResetOk, 'success')
-                  })()
-                }}
-              >
-                {t.common.resetDemo}
-              </Button>
-            </div>
-          </div>
-        ) : null}
-    </motion.div>
-  )
-
   return (
     <>
       {isMobileRide ? (
@@ -701,7 +495,6 @@ export function RidePage() {
                   <RideDriverCard driver={driver} vehicle={vehicle} t={t} distPickup={distPickup} />
                 ) : null}
                 {rideActionButtons}
-                {demoPanel}
               </div>
             </div>
           </div>
@@ -758,8 +551,6 @@ export function RidePage() {
         ) : null}
 
         {rideActionButtons}
-
-        {demoPanel}
       </div>
       ) : null}
 

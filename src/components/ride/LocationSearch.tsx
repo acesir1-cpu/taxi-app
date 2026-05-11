@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { MapPin, X } from 'lucide-react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Location } from '../../types/domain'
 import { strings } from '../../i18n/strings'
 import { searchLocations } from '../../services/locationApi'
@@ -33,6 +34,9 @@ export function LocationSearch({
   const [q, setQ] = useState(value?.label ?? '')
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const anchorRef = useRef<HTMLDivElement>(null)
+  const portalListRef = useRef<HTMLUListElement>(null)
+  const [floatingStyle, setFloatingStyle] = useState<CSSProperties | null>(null)
   const trimmedLen = q.trim().length
   const [debouncedQ, setDebouncedQ] = useState(q)
 
@@ -59,12 +63,66 @@ export function LocationSearch({
   })
 
   useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+    function onDoc(e: PointerEvent) {
+      const t = e.target as Node
+      if (wrapRef.current?.contains(t) || portalListRef.current?.contains(t)) return
+      setOpen(false)
     }
-    document.addEventListener('mousedown', onDoc)
-    return () => document.removeEventListener('mousedown', onDoc)
+    document.addEventListener('pointerdown', onDoc)
+    return () => document.removeEventListener('pointerdown', onDoc)
   }, [])
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setFloatingStyle(null)
+      return
+    }
+    const anchor = anchorRef.current
+    if (!anchor) return
+
+    function positionList() {
+      const r = anchor.getBoundingClientRect()
+      const vv = window.visualViewport
+      const gap = 6
+      let spaceBelow: number
+      let spaceAbove: number
+      if (vv) {
+        spaceBelow = vv.offsetTop + vv.height - r.bottom - gap
+        spaceAbove = r.top - vv.offsetTop - gap
+      } else {
+        spaceBelow = window.innerHeight - r.bottom - gap
+        spaceAbove = r.top - gap
+      }
+      const minReadable = 112
+      const flip = spaceBelow < minReadable && spaceAbove > spaceBelow
+      const rawMax = Math.max(96, Math.min(208, flip ? spaceAbove : spaceBelow))
+      const maxH = Number.isFinite(rawMax) ? rawMax : 208
+
+      setFloatingStyle({
+        position: 'fixed',
+        left: r.left,
+        width: r.width,
+        maxHeight: maxH,
+        zIndex: 100,
+        ...(flip
+          ? { bottom: window.innerHeight - r.top + gap, top: 'auto' }
+          : { top: r.bottom + gap, bottom: 'auto' }),
+      })
+    }
+
+    positionList()
+    const vv = window.visualViewport
+    vv?.addEventListener('resize', positionList)
+    vv?.addEventListener('scroll', positionList)
+    window.addEventListener('resize', positionList)
+    window.addEventListener('scroll', positionList, true)
+    return () => {
+      vv?.removeEventListener('resize', positionList)
+      vv?.removeEventListener('scroll', positionList)
+      window.removeEventListener('resize', positionList)
+      window.removeEventListener('scroll', positionList, true)
+    }
+  }, [open, q, results.length, isFetching])
 
   const showFormReset = Boolean(formReset?.visible)
   const inputPadRight = showFormReset && rightAction ? 'pr-[7.5rem]' : showFormReset ? 'pr-12' : rightAction ? 'pr-11' : undefined
@@ -72,13 +130,18 @@ export function LocationSearch({
   return (
     <div ref={wrapRef} className="relative space-y-1.5">
       <Label className="text-sm font-semibold text-slate-800">{label}</Label>
-      <div className="relative">
+      <div ref={anchorRef} className="relative">
         <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <Input
           className={cn('h-11 pl-9', inputPadRight)}
           placeholder={placeholder}
           value={q}
-          onFocus={() => setOpen(true)}
+          onFocus={(e) => {
+            setOpen(true)
+            requestAnimationFrame(() => {
+              e.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            })
+          }}
           onChange={(e) => {
             setQ(e.target.value)
             setOpen(true)
@@ -104,38 +167,43 @@ export function LocationSearch({
             {rightAction}
           </div>
         ) : null}
-        {open ? (
-          <ul
-            className="absolute z-30 mt-1 max-h-52 w-full overflow-auto rounded-xl border border-brand-border bg-white py-1 shadow-lg"
-            role="listbox"
-          >
-            {isFetching && results.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-slate-500">{t.common.loading}</li>
-            ) : null}
-            {!isFetching && results.length === 0 ? (
-              <li className="px-3 py-2 text-xs text-slate-500">{emptyHint ?? t.order.geocodeEmpty}</li>
-            ) : null}
-            {results.map((loc) => (
-              <li key={loc.id}>
-                <button
-                  type="button"
-                  className={cn(
-                    'flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-slate-50',
-                    value?.id === loc.id && 'bg-slate-50'
-                  )}
-                  onClick={() => {
-                    onChange(loc)
-                    setQ(loc.label)
-                    setOpen(false)
-                  }}
-                >
-                  <span className="font-semibold text-brand-navy">{loc.label}</span>
-                  <span className="text-xs text-slate-500">{loc.address}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {open && floatingStyle && typeof document !== 'undefined'
+          ? createPortal(
+              <ul
+                ref={portalListRef}
+                className="overflow-auto rounded-xl border border-brand-border bg-white py-1 shadow-lg"
+                style={floatingStyle}
+                role="listbox"
+              >
+                {isFetching && results.length === 0 ? (
+                  <li className="px-3 py-2 text-xs text-slate-500">{t.common.loading}</li>
+                ) : null}
+                {!isFetching && results.length === 0 ? (
+                  <li className="px-3 py-2 text-xs text-slate-500">{emptyHint ?? t.order.geocodeEmpty}</li>
+                ) : null}
+                {results.map((loc) => (
+                  <li key={loc.id}>
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-slate-50',
+                        value?.id === loc.id && 'bg-slate-50'
+                      )}
+                      onClick={() => {
+                        onChange(loc)
+                        setQ(loc.label)
+                        setOpen(false)
+                      }}
+                    >
+                      <span className="font-semibold text-brand-navy">{loc.label}</span>
+                      <span className="text-xs text-slate-500">{loc.address}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>,
+              document.body
+            )
+          : null}
       </div>
     </div>
   )

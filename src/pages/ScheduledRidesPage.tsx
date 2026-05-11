@@ -2,16 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, Clock3, MapPin, PencilLine, Plus, Trash2 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { strings } from '../i18n/strings'
+import { strings, type AppMessages } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
-import type { Location, RideRequest } from '../types/domain'
+import type { Location, RideRequest, RideRequestStatus } from '../types/domain'
 import {
   cancelRideRequest,
   getScheduledRideRequests,
   updateScheduledRideRequest,
 } from '../services/rideApi'
 import { LocationSearch } from '../components/ride/LocationSearch'
-import { cn } from '../lib/utils'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -47,21 +46,15 @@ export function ScheduledRidesPage() {
   const requests = useMemo(() => scheduledQ.data ?? [], [scheduledQ.data])
 
   return (
-    <div
-      className={cn(
-        'relative mx-auto w-full max-w-[1200px] space-y-4',
-        'max-lg:-mx-4 max-lg:min-h-[100dvh] max-lg:px-4 max-lg:pb-6 sm:max-lg:-mx-6 sm:max-lg:px-6',
-        'lg:mx-auto lg:min-h-0 lg:pb-0'
-      )}
-    >
-      <h1 className="text-xl font-bold text-brand-navy lg:px-4">{t.nav.scheduled}</h1>
+    <div className="mx-auto w-full max-w-[1200px] space-y-4">
+      <h1 className="text-center text-xl font-bold text-brand-navy lg:px-4 lg:text-left">{t.nav.scheduled}</h1>
 
       {scheduledQ.isLoading ? (
-        <p className="text-sm text-slate-500">{t.common.loading}</p>
+        <p className="text-center text-sm text-slate-500 lg:text-left">{t.common.loading}</p>
       ) : requests.length === 0 ? (
-        <div className="min-h-[calc(100dvh-var(--mobile-nav-height,5.25rem)-34rem)] md:min-h-0">
-          <Card className="h-full">
-            <CardContent className="flex h-full flex-col items-center justify-center gap-3 py-8 text-center">
+        <div className="flex min-h-[calc(100svh-10.5rem)] flex-col justify-center md:min-h-0">
+          <Card className="w-full">
+            <CardContent className="flex flex-col items-center justify-center gap-3 px-4 py-10 text-center sm:px-6">
               <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                 <CalendarClock className="h-7 w-7" />
               </span>
@@ -74,23 +67,23 @@ export function ScheduledRidesPage() {
           </Card>
         </div>
       ) : (
-        <div className="grid min-h-[calc(100dvh-var(--mobile-nav-height,5.25rem)-34rem)] grid-cols-1 items-start gap-3 md:min-h-0 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
           {requests.map((request) => (
               <Card
               key={request.id}
                 className="group flex flex-col rounded-[18px] border-slate-200/90 transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
             >
               <CardHeader className="space-y-2 pb-0 pt-4">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-base text-brand-navy md:block md:text-base max-md:hidden">{t.order.scheduleRide}</CardTitle>
-                  <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700 md:inline-flex max-md:hidden">
+                <div className="flex flex-col items-center gap-2 text-center sm:max-md:px-1 md:flex-row md:items-center md:justify-between md:text-left">
+                  <CardTitle className="hidden text-base text-brand-navy md:block md:text-base">{t.order.scheduleRide}</CardTitle>
+                  <span className="hidden rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700 md:inline-flex">
                     {t.order.schedule}
                   </span>
-                  <p className="truncate text-[1rem] font-bold text-brand-navy md:hidden">
+                  <p className="line-clamp-3 text-[0.95rem] font-bold leading-snug text-brand-navy md:hidden">
                     {request.pickup.label} {'\u2192'} {request.destination.label}
                   </p>
-                  <span className={statusBadgeClass(request.status)}>
-                    {request.status}
+                  <span className={scheduledRequestStatusBadgeClass(request.status)}>
+                    {scheduledRequestStatusLabel(request.status, t.order.scheduledRequestStatus)}
                   </span>
                 </div>
               </CardHeader>
@@ -319,10 +312,27 @@ function toLocalDateTimeValue(date: Date): string {
   return `${y}-${m}-${d}T${h}:${min}`
 }
 
-function statusBadgeClass(status: string): string {
+function scheduledRequestStatusLabel(
+  status: RideRequestStatus,
+  messages: AppMessages['order']['scheduledRequestStatus']
+): string {
+  return messages[status] ?? status
+}
+
+function scheduledRequestStatusBadgeClass(status: RideRequestStatus): string {
   const base =
-    'rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide md:hidden'
-  if (status === 'dodijeljen') return `${base} bg-emerald-100 text-emerald-700`
-  if (status === 'otkazan') return `${base} bg-rose-100 text-rose-700`
-  return `${base} bg-blue-100 text-blue-700`
+    'inline-flex max-w-[100%] shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-tight tracking-normal'
+  switch (status) {
+    case 'dodijeljen':
+      return `${base} bg-emerald-100 text-emerald-800`
+    case 'otkazan':
+      return `${base} bg-rose-100 text-rose-800`
+    case 'neuspjesan':
+      return `${base} bg-orange-100 text-orange-900`
+    case 'u_obradi':
+      return `${base} bg-amber-100 text-amber-900`
+    case 'kreiran':
+    default:
+      return `${base} bg-slate-100 text-slate-700`
+  }
 }
