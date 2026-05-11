@@ -11,20 +11,12 @@ import { buildRegisterSchema, type RegisterFormValues } from '../schemas/auth'
 import { register } from '../services/authApi'
 import { setPendingVerifyAccountId } from '../utils/storage'
 import { useToastStore } from '../store/notificationStore'
-import {
-  AuthInput,
-  Field,
-  PrimaryButton,
-  RoleToggle,
-} from '../components/auth/authPrimitives'
+import { AuthInput, Field, PrimaryButton } from '../components/auth/authPrimitives'
 import { cn } from '../lib/utils'
-
-type AuthMode = 'passenger' | 'driver'
 
 export function RegisterPage() {
   useLangRefresh()
   const t = strings()
-  const [mode, setMode] = useState<AuthMode>('passenger')
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -61,11 +53,6 @@ export function RegisterPage() {
   })
 
   function onSubmit(v: RegisterFormValues) {
-    if (mode === 'driver') {
-      // Driver self-signup is not supported by the current auth API; route to support.
-      push(t.auth.driverRegisterDisabled, 'info')
-      return
-    }
     if (!acceptedTerms) {
       push(t.auth.acceptTermsError, 'error')
       return
@@ -89,13 +76,6 @@ export function RegisterPage() {
       <p className="auth-marketing-page-subtitle mt-1 text-[14px] text-[#6B7280] md:mt-0 md:text-[13px]">
         {t.auth.registerSubtitle}
       </p>
-
-      <RoleToggle
-        mode={mode}
-        onChange={setMode}
-        passengerLabel={t.auth.passengerMode}
-        driverLabel={t.auth.driverMode}
-      />
 
       <form className="mt-4 flex flex-col gap-3" onSubmit={form.handleSubmit(onSubmit)}>
         {/* Row 1: Ime / Prezime */}

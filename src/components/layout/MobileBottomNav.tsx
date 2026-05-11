@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { CalendarClock, Car, History, LogOut, Navigation, Settings, User, UserCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { logout } from '../../services/authApi'
 import { strings } from '../../i18n/strings'
@@ -25,6 +25,21 @@ export function MobileBottomNav({ accountId, name }: { accountId: string; name: 
   const qc = useQueryClient()
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [avatarDataUrl, setAvatarDataUrl] = useState(() => loadPassengerProfileExtras(accountId).avatarDataUrl ?? '')
+  const navRef = useRef<HTMLElement>(null)
+
+  useLayoutEffect(() => {
+    const el = navRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const root = document.documentElement
+    const apply = () => root.style.setProperty('--mobile-nav-shell-height', `${el.getBoundingClientRect().height}px`)
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--mobile-nav-shell-height')
+    }
+  }, [])
 
   useEffect(() => {
     setProfileMenuOpen(false)
@@ -88,7 +103,11 @@ export function MobileBottomNav({ accountId, name }: { accountId: string; name: 
           {t.auth.logout}
         </button>
       </MobileNavOverflowMenu>
-      <nav className={cn('passenger-mobile-nav', mobileTabBarNavShellClassName)} role="navigation">
+      <nav
+        ref={navRef}
+        className={cn('passenger-mobile-nav', mobileTabBarNavShellClassName)}
+        role="navigation"
+      >
         <NavLink to="/app/order" className={navLinkClass}>
           <Car className="h-5 w-5" />
           {t.nav.order}

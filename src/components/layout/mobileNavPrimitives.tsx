@@ -26,8 +26,12 @@ export const mobileNavOverflowMenuLinkClassName =
 export const mobileNavOverflowMenuDangerClassName =
   'flex h-14 w-full items-center gap-3 px-4 text-left text-[15px] font-medium text-[#EF4444] no-underline transition-colors active:bg-red-50'
 
-const sheetBottomOffset =
-  'calc(var(--mobile-nav-height, 5.25rem) + env(safe-area-inset-bottom, 0px))'
+/**
+ * Pixel height of the fixed tab bar, set by ResizeObserver on the nav (see MobileBottomNav /
+ * DriverMobileNav). Fallback is --mobile-nav-height only — do not add safe-area here: padding for
+ * the home indicator is already inside the nav’s border box.
+ */
+const sheetBottomOffset = 'var(--mobile-nav-shell-height, var(--mobile-nav-height, 5.25rem))'
 
 export const mobileNavOverflowSheetRowBase =
   'flex h-14 w-full shrink-0 items-center gap-3 px-4 text-left text-[15px] font-medium text-slate-800 no-underline transition-colors active:bg-slate-50'

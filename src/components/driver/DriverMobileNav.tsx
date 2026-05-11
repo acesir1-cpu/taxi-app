@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { Banknote, Car, History, LayoutDashboard, LogOut, Settings, User } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { logout } from '../../services/authApi'
 import { strings } from '../../i18n/strings'
@@ -23,6 +23,21 @@ export function DriverMobileNav() {
   const location = useLocation()
   const qc = useQueryClient()
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  const navRef = useRef<HTMLElement>(null)
+
+  useLayoutEffect(() => {
+    const el = navRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const root = document.documentElement
+    const apply = () => root.style.setProperty('--mobile-nav-shell-height', `${el.getBoundingClientRect().height}px`)
+    apply()
+    const ro = new ResizeObserver(apply)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--mobile-nav-shell-height')
+    }
+  }, [])
 
   useEffect(() => {
     setSettingsMenuOpen(false)
@@ -71,6 +86,7 @@ export function DriverMobileNav() {
         </button>
       </MobileNavOverflowMenu>
       <nav
+        ref={navRef}
         className={cn('driver-mobile-nav', mobileTabBarNavShellClassName)}
         role="navigation"
         aria-label={t.driver.mobileNavAria}
