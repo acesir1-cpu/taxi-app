@@ -1,11 +1,15 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import { useMe } from '../../hooks/useMe'
 import { useActiveRide } from '../../hooks/useActiveRide'
 import { useLangRefresh } from '../../hooks/useLangRefresh'
+import { hasCompletedPassengerAppTour } from '../../lib/passengerAppTourStorage'
+import { loadPassengerProfileExtras } from '../../lib/passengerSettingsPrefs'
 import { strings } from '../../i18n/strings'
 import { LoadingState } from '../common/LoadingState'
+import { PassengerAppTour } from '../onboarding/PassengerAppTour'
+import { PassengerHomeAddressModal } from '../onboarding/PassengerHomeAddressModal'
 import { ActiveRideBanner } from './ActiveRideBanner'
 import { MobileFloatingNotifications } from './MobileFloatingNotifications'
 import { MobileBottomNav } from './MobileBottomNav'
@@ -16,7 +20,11 @@ export function AppShell() {
   const t = strings()
   const location = useLocation()
   const { data: me, isLoading } = useMe()
+  const passengerAccountId = me?.kind === 'passenger' ? me.account.id : ''
   const { data: active } = useActiveRide(me?.kind === 'passenger' ? me.profile.id : undefined)
+
+  const [homeAddressModalOpen, setHomeAddressModalOpen] = useState(false)
+  const [appTourOpen, setAppTourOpen] = useState(false)
 
   useEffect(() => {
     document.body.classList.add('app-mobile-nav')
@@ -24,6 +32,14 @@ export function AppShell() {
       document.body.classList.remove('app-mobile-nav')
     }
   }, [])
+
+  useEffect(() => {
+    if (!passengerAccountId) return
+    const ex = loadPassengerProfileExtras(passengerAccountId)
+    const needHomePrompt = !ex.homeAddressOnboardingDismissed
+    setHomeAddressModalOpen(needHomePrompt)
+    setAppTourOpen(Boolean(ex.homeAddressOnboardingDismissed && !hasCompletedPassengerAppTour(passengerAccountId)))
+  }, [passengerAccountId])
 
   if (isLoading || !me || me.kind !== 'passenger') {
     return (
@@ -34,6 +50,14 @@ export function AppShell() {
   }
 
   const name = `${me.profile.firstName} ${me.profile.lastName}`
+
+  function onHomeAddressModalClose() {
+    setHomeAddressModalOpen(false)
+    if (passengerAccountId && !hasCompletedPassengerAppTour(passengerAccountId)) {
+      setAppTourOpen(true)
+    }
+  }
+
   const isOnActiveRideScreen = location.pathname === '/app/active' || location.pathname.startsWith('/app/ride/')
   /** Match confirmation lives on SearchingPage; banner would duplicate “go to ride” before user confirms. */
   const isOnSearching = location.pathname === '/app/searching'
@@ -69,6 +93,14 @@ export function AppShell() {
         <Outlet context={{ me, activeRide: active }} />
       </main>
       <MobileBottomNav accountId={me.account.id} name={name} />
+      <PassengerHomeAddressModal
+        open={homeAddressModalOpen}
+        accountId={me.account.id}
+        onClose={onHomeAddressModalClose}
+      />
+      {appTourOpen && !homeAddressModalOpen ? (
+        <PassengerAppTour accountId={me.account.id} onComplete={() => setAppTourOpen(false)} />
+      ) : null}
     </div>
   )
 }

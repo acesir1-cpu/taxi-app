@@ -16,6 +16,7 @@ import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
 import { Badge } from '../components/ui/badge'
+import { GpsConsentDialog } from '../components/onboarding/GpsConsentDialog'
 import { AccountProfileFormFields } from '../components/settings/AccountProfileFormFields'
 import { LogoutSection } from '../components/settings/LogoutSection'
 import { SavedLocationCard } from '../components/settings/SavedLocationCard'
@@ -27,6 +28,7 @@ import { TextAreaField } from '../components/settings/TextAreaField'
 import { ToggleRow } from '../components/settings/ToggleRow'
 import { validateAccountProfile } from '../lib/accountProfileValidation'
 import {
+  defaultPassengerSavedLocations,
   loadPassengerLocationPrefs,
   loadPassengerNotifyPrefs,
   loadPassengerPersonalize,
@@ -112,17 +114,21 @@ export function ProfilePage() {
   const [deleteHistoryModal, setDeleteHistoryModal] = useState(false)
   const [deleteHistoryLoading, setDeleteHistoryLoading] = useState(false)
   const [deleteHistoryStep, setDeleteHistoryStep] = useState<1 | 2>(1)
+  const [gpsConsentOpen, setGpsConsentOpen] = useState(false)
   const [addLocationModal, setAddLocationModal] = useState(false)
   const [rideTargetModal, setRideTargetModal] = useState<Location | null>(null)
-  const [savedLocations, setSavedLocations] = useState({
-    home: 'Ul. Zmaja od Bosne 12, Sarajevo',
-    work: 'Trg djece Sarajeva 5, Sarajevo',
-    favorites: [
-      { id: 'fav-1', name: 'Aerodrom', address: 'Kurta Schorka 36, Sarajevo' },
-      { id: 'fav-2', name: 'BCC', address: 'Branilaca Sarajeva 20, Sarajevo' },
-    ],
+  const [savedLocations, setSavedLocations] = useState(
+    () => loadPassengerProfileExtras(me.account.id).savedLocations ?? defaultPassengerSavedLocations()
+  )
+  const [homePostalCodeState, setHomePostalCodeState] = useState(
+    () => loadPassengerProfileExtras(me.account.id).homePostalCode ?? ''
+  )
+  const [locationForm, setLocationForm] = useState({
+    name: '',
+    address: '',
+    postalCode: '',
+    type: 'favorit' as 'kuca' | 'posao' | 'favorit',
   })
-  const [locationForm, setLocationForm] = useState({ name: '', address: '', type: 'favorit' as 'kuca' | 'posao' | 'favorit' })
   const tr = (bs: string, en: string) => (getGuestLang() === 'en' ? en : bs)
 
   useEffect(() => {
@@ -145,6 +151,7 @@ export function ProfilePage() {
     if (ex.savedLocations) {
       setSavedLocations(ex.savedLocations)
     }
+    setHomePostalCodeState(ex.homePostalCode ?? '')
   }, [me.account.id, me.account.email, me.account.phone, me.profile.firstName, me.profile.lastName])
 
   useEffect(() => {
@@ -175,7 +182,15 @@ export function ProfilePage() {
         push(t.common.error, 'error')
         return
       }
-      savePassengerProfileExtras(me.account.id, { city: v.city, address: v.address, avatarDataUrl: profilePhoto })
+      const cur = loadPassengerProfileExtras(me.account.id)
+      savePassengerProfileExtras(me.account.id, {
+        ...cur,
+        city: v.city,
+        address: v.address,
+        avatarDataUrl: profilePhoto,
+        homePostalCode: homePostalCodeState,
+        savedLocations,
+      })
       savePassengerPersonalize(me.account.id, {
         ...loadPassengerPersonalize(me.account.id),
         appLang: v.appLang,
@@ -307,21 +322,42 @@ export function ProfilePage() {
         : locationForm.type === 'posao'
           ? { ...savedLocations, work: locationForm.address.trim() }
           : {
-        ...savedLocations,
-        favorites: [
-          ...savedLocations.favorites,
-          { id: `fav-${Date.now()}`, name: locationForm.name.trim(), address: locationForm.address.trim() },
-        ],
-      }
+              ...savedLocations,
+              favorites: [
+                ...savedLocations.favorites,
+                { id: `fav-${Date.now()}`, name: locationForm.name.trim(), address: locationForm.address.trim() },
+              ],
+            }
     setSavedLocations(nextSaved)
     const current = loadPassengerProfileExtras(me.account.id)
-    savePassengerProfileExtras(me.account.id, { ...current, savedLocations: nextSaved })
+    const nextPostal =
+      locationForm.type === 'kuca' ? locationForm.postalCode.trim() : current.homePostalCode ?? ''
+    if (locationForm.type === 'kuca') {
+      setHomePostalCodeState(locationForm.postalCode.trim())
+    }
+    savePassengerProfileExtras(me.account.id, {
+      ...current,
+      savedLocations: nextSaved,
+      ...(locationForm.type === 'kuca' ? { homePostalCode: nextPostal } : {}),
+    })
+    window.dispatchEvent(new CustomEvent('urbanflow:passenger-profile-extras-updated'))
     setAddLocationModal(false)
-    setLocationForm({ name: '', address: '', type: 'favorit' })
+    setLocationForm({ name: '', address: '', postalCode: '', type: 'favorit' })
     push(tr('Lokacija je uspješno sačuvana.', 'Location saved successfully.'), 'success')
   }
 
   function selectLocationForRide(address: string) {
+    if (!address.trim()) {
+      push(
+        tr(
+          'Dodajte adresu kuće i poštanski broj u postavkama da biste koristili brzo punjenje.',
+          'Add your home address and postal code in settings to use quick fill.'
+        ),
+        'info'
+      )
+      navigate('/app/profile#saved-places')
+      return
+    }
     setRideTargetModal({
       id: `manual-${Date.now()}`,
       label: address,
@@ -352,7 +388,7 @@ export function ProfilePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4">
+    <div className="mx-auto w-full max-w-[1200px] space-y-4" data-passenger-tour-target="profile">
       <h1 className="text-2xl font-bold text-brand-navy">{tr('Postavke', 'Settings')}</h1>
       <Card className="shadow-[0_8px_30px_rgba(0,0,0,0.08)]">
         <CardHeader className="p-6 pb-0">
@@ -579,12 +615,17 @@ export function ProfilePage() {
               description={tr('Omogućava brže postavljanje polazišta i preciznije procjene.', 'Enables faster pickup setup and more accurate estimates.')}
               enabled={locationPrefs.gps}
               onChange={(v) => {
-                const next = { ...locationPrefs, gps: v, gpsPromptSeen: true }
+                if (v) {
+                  setGpsConsentOpen(true)
+                  return
+                }
+                const next = { ...locationPrefs, gps: false, gpsPromptSeen: true }
                 setLocationPrefs(next)
                 savePassengerLocationPrefs(me.account.id, {
                   gps: next.gps,
                   gpsPromptSeen: next.gpsPromptSeen,
                 })
+                window.dispatchEvent(new CustomEvent('urbanflow:passenger-location-prefs-updated'))
               }}
             />
             {!locationPrefs.gps ? (
@@ -637,10 +678,42 @@ export function ProfilePage() {
             </Button>
           </SettingsSectionCard>
 
-          <SettingsSectionCard icon={Star} title={tr('Favoriti i sačuvane lokacije', 'Favorites and saved locations')} color="bg-amber-500 text-brand-navy">
+          <SettingsSectionCard
+            id="saved-places"
+            icon={Star}
+            title={tr('Favoriti i sačuvane lokacije', 'Favorites and saved locations')}
+            color="bg-amber-500 text-brand-navy"
+          >
             <div className="grid gap-3 md:grid-cols-2">
-              <SavedLocationCard title={tr('Kuća', 'Home')} address={savedLocations.home} onEdit={() => { setLocationForm({ name: tr('Kuća', 'Home'), address: savedLocations.home, type: 'kuca' }); setAddLocationModal(true) }} onUse={() => selectLocationForRide(savedLocations.home)} icon={Home} editLabel={tr('Uredi', 'Edit')} useLabel={tr('Koristi za vožnju', 'Use for ride')} />
-              <SavedLocationCard title={tr('Posao', 'Work')} address={savedLocations.work} onEdit={() => { setLocationForm({ name: tr('Posao', 'Work'), address: savedLocations.work, type: 'posao' }); setAddLocationModal(true) }} onUse={() => selectLocationForRide(savedLocations.work)} icon={MapPin} editLabel={tr('Uredi', 'Edit')} useLabel={tr('Koristi za vožnju', 'Use for ride')} />
+              <SavedLocationCard
+                title={tr('Kuća', 'Home')}
+                address={savedLocations.home}
+                onEdit={() => {
+                  setLocationForm({
+                    name: tr('Kuća', 'Home'),
+                    address: savedLocations.home,
+                    postalCode: homePostalCodeState,
+                    type: 'kuca',
+                  })
+                  setAddLocationModal(true)
+                }}
+                onUse={() => selectLocationForRide(savedLocations.home)}
+                icon={Home}
+                editLabel={tr('Uredi', 'Edit')}
+                useLabel={tr('Koristi za vožnju', 'Use for ride')}
+              />
+              <SavedLocationCard
+                title={tr('Posao', 'Work')}
+                address={savedLocations.work}
+                onEdit={() => {
+                  setLocationForm({ name: tr('Posao', 'Work'), address: savedLocations.work, postalCode: '', type: 'posao' })
+                  setAddLocationModal(true)
+                }}
+                onUse={() => selectLocationForRide(savedLocations.work)}
+                icon={MapPin}
+                editLabel={tr('Uredi', 'Edit')}
+                useLabel={tr('Koristi za vožnju', 'Use for ride')}
+              />
             </div>
             <div className="rounded-2xl border border-black/[0.08] bg-white p-4">
               <p className="mb-3 font-semibold text-brand-navy">{t.profile.favoritesHeading}</p>
@@ -656,7 +729,16 @@ export function ProfilePage() {
                 ))}
               </div>
             </div>
-            <Button type="button" className="w-full sm:w-auto" onClick={() => setAddLocationModal(true)}>{tr('Dodaj lokaciju', 'Add location')}</Button>
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setLocationForm({ name: '', address: '', postalCode: '', type: 'favorit' })
+                setAddLocationModal(true)
+              }}
+            >
+              {tr('Dodaj lokaciju', 'Add location')}
+            </Button>
           </SettingsSectionCard>
 
           <SettingsSectionCard icon={Globe2} title={tr('Personalizacija', 'Personalization')} color="bg-indigo-600 text-white">
@@ -741,9 +823,26 @@ export function ProfilePage() {
         <div className="space-y-3">
           <SettingsField label={tr('Naziv lokacije', 'Location name')} value={locationForm.name} onChange={(value) => setLocationForm((prev) => ({ ...prev, name: value }))} />
           <SettingsField label={tr('Adresa', 'Address')} value={locationForm.address} onChange={(value) => setLocationForm((prev) => ({ ...prev, address: value }))} />
+          {locationForm.type === 'kuca' ? (
+            <SettingsField
+              label={tr('Poštanski broj', 'Postal code')}
+              value={locationForm.postalCode}
+              onChange={(value) => setLocationForm((prev) => ({ ...prev, postalCode: value }))}
+            />
+          ) : null}
           <div className="space-y-1.5">
             <Label>{tr('Tip', 'Type')}</Label>
-            <select className="h-11 w-full rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy" value={locationForm.type} onChange={(e) => setLocationForm((prev) => ({ ...prev, type: e.target.value as 'kuca' | 'posao' | 'favorit' }))}>
+            <select
+              className="h-11 w-full rounded-xl border border-black/[0.14] bg-white px-3 text-sm font-medium text-brand-navy"
+              value={locationForm.type}
+              onChange={(e) =>
+                setLocationForm((prev) => ({
+                  ...prev,
+                  type: e.target.value as 'kuca' | 'posao' | 'favorit',
+                  postalCode: e.target.value === 'kuca' ? prev.postalCode : '',
+                }))
+              }
+            >
               <option value="kuca">{tr('Kuća', 'Home')}</option>
               <option value="posao">{tr('Posao', 'Work')}</option>
               <option value="favorit">{tr('Favorit', 'Favorite')}</option>
@@ -921,6 +1020,33 @@ export function ProfilePage() {
           )}
         </div>
       </SimpleModal>
+      <GpsConsentDialog
+        open={gpsConsentOpen}
+        onAllow={() => {
+          setGpsConsentOpen(false)
+          if (typeof navigator === 'undefined' || !navigator.geolocation) {
+            push(t.order.geoUnsupported, 'error')
+            return
+          }
+          navigator.geolocation.getCurrentPosition(
+            () => {
+              const next = { gps: true, gpsPromptSeen: true }
+              setLocationPrefs((prev) => ({ ...prev, ...next }))
+              savePassengerLocationPrefs(me.account.id, next)
+              window.dispatchEvent(new CustomEvent('urbanflow:passenger-location-prefs-updated'))
+            },
+            () => {
+              const next = { gps: false, gpsPromptSeen: true }
+              setLocationPrefs((prev) => ({ ...prev, ...next }))
+              savePassengerLocationPrefs(me.account.id, next)
+              window.dispatchEvent(new CustomEvent('urbanflow:passenger-location-prefs-updated'))
+              push(t.order.geoDenied, 'error')
+            },
+            { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 }
+          )
+        }}
+        onDeny={() => setGpsConsentOpen(false)}
+      />
     </div>
   )
 }

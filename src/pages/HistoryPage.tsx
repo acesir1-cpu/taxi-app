@@ -128,7 +128,7 @@ export function HistoryPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4">
+    <div className="mx-auto w-full max-w-[1200px] space-y-4" data-passenger-tour-target="history">
       <h1 className="text-2xl font-bold text-brand-navy">{t.history.title}</h1>
       {!historySaveDisabled && rides.length > 0 ? (
         <div className="flex justify-end">

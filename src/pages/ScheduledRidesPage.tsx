@@ -46,7 +46,7 @@ export function ScheduledRidesPage() {
   const requests = useMemo(() => scheduledQ.data ?? [], [scheduledQ.data])
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4">
+    <div className="mx-auto w-full max-w-[1200px] space-y-4" data-passenger-tour-target="scheduled">
       <h1 className="text-center text-xl font-bold text-brand-navy lg:px-4 lg:text-left">{t.nav.scheduled}</h1>
 
       {scheduledQ.isLoading ? (

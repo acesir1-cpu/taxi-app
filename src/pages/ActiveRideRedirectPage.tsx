@@ -16,11 +16,15 @@ export function ActiveRideRedirectPage() {
   }, [activeRide, navigate])
 
   if (activeRide) {
-    return <p className="p-6 text-center text-sm text-slate-600">{t.common.loading}</p>
+    return (
+      <p className="p-6 text-center text-sm text-slate-600" data-passenger-tour-target="active">
+        {t.common.loading}
+      </p>
+    )
   }
 
   return (
-    <div className="flex min-h-[50vh] items-center justify-center">
+    <div className="flex min-h-[50vh] items-center justify-center" data-passenger-tour-target="active">
       <div className="w-full max-w-md rounded-2xl border border-brand-border bg-white p-8 text-center shadow-card">
         <h2 className="text-lg font-semibold text-brand-navy">{t.notifications.noActiveRide}</h2>
         <p className="mt-2 text-sm text-slate-600">{t.history.empty}</p>

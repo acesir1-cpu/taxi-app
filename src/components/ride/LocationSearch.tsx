@@ -80,7 +80,7 @@ export function LocationSearch({
     const anchor = anchorRef.current
     if (!anchor) return
 
-    function positionList() {
+    const positionList = () => {
       const r = anchor.getBoundingClientRect()
       const vv = window.visualViewport
       const gap = 6

@@ -1,17 +1,16 @@
-const KEY = 'hasSeenMapGuide'
+const keyFor = (accountId: string) => `urbanflow:passenger:${accountId}:mapGuideSeen`
 
-export function hasSeenMapGuide(): boolean {
+export function hasSeenMapGuide(accountId: string): boolean {
   try {
-    return localStorage.getItem(KEY) === 'true'
+    return localStorage.getItem(keyFor(accountId)) === 'true'
   } catch {
-    /* Ako LS nije dostupan, tretiraj kao da vodič nije viđen — prikaži upute. */
     return false
   }
 }
 
-export function setMapGuideSeen(): void {
+export function setMapGuideSeen(accountId: string): void {
   try {
-    localStorage.setItem(KEY, 'true')
+    localStorage.setItem(keyFor(accountId), 'true')
   } catch {
     /* ignore */
   }

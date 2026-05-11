@@ -32,6 +32,7 @@ import { getGuestLang } from '../i18n/guestLocale'
 import type { AppOutletContext } from '../types/appContext'
 import type { Location, OrderType } from '../types/domain'
 import { calculateRoute, createLocationFromMapClick, isInServiceZone } from '../services/locationApi'
+import { hasCompletedPassengerAppTour } from '../lib/passengerAppTourStorage'
 import {
   cancelRideRequest,
   createRideRequest,
@@ -52,10 +53,16 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { GpsConsentDialog } from '../components/onboarding/GpsConsentDialog'
 import { MapLocationOnboarding } from '../components/onboarding/MapLocationOnboarding'
+import {
+  URBANFLOW_EXPAND_ORDER_SHEET,
+  URBANFLOW_PASSENGER_APP_TOUR_COMPLETE,
+} from '../components/onboarding/PassengerAppTour'
 import { hasSeenMapGuide, setMapGuideSeen } from '../lib/mapGuideStorage'
 import { getHistoryPrivacyPrefs } from '../lib/historyPrivacy'
 import {
+  defaultPassengerSavedLocations,
   loadPassengerLocationPrefs,
   loadPassengerProfileExtras,
   savePassengerLocationPrefs,
@@ -134,9 +141,7 @@ export function OrderPage() {
   const [scheduleMin, setScheduleMin] = useState(() => toLocalDateTimeValue(new Date()))
   const [mapPickTarget, setMapPickTarget] = useState<'pickup' | 'destination' | null>(null)
   const [mapOverlayDismissed, setMapOverlayDismissed] = useState(false)
-  const [mapGuideActive, setMapGuideActive] = useState(
-    () => typeof window !== 'undefined' && !hasSeenMapGuide()
-  )
+  const [mapGuideActive, setMapGuideActive] = useState(false)
   const [mapGuideStep, setMapGuideStep] = useState<1 | 2 | 3>(1)
   const [geoLoading, setGeoLoading] = useState(false)
   const [mobilePickupMethod, setMobilePickupMethod] = useState<MobileLocMethod>(null)
@@ -167,11 +172,22 @@ export function OrderPage() {
   const [sameLocationError, setSameLocationError] = useState(false)
   const [scheduleInputError, setScheduleInputError] = useState(false)
   const historyPrefs = getHistoryPrivacyPrefs(me.account.id)
-  const profileExtras = useMemo(() => loadPassengerProfileExtras(me.account.id), [me.account.id])
+  const [profileExtrasNonce, setProfileExtrasNonce] = useState(0)
+  useEffect(() => {
+    const bump = () => setProfileExtrasNonce((n) => n + 1)
+    window.addEventListener('urbanflow:passenger-profile-extras-updated', bump)
+    return () => window.removeEventListener('urbanflow:passenger-profile-extras-updated', bump)
+  }, [])
+  const profileExtras = useMemo(
+    () => loadPassengerProfileExtras(me.account.id),
+    [me.account.id, profileExtrasNonce]
+  )
   const [locationPrefs, setLocationPrefs] = useState<PassengerLocationPrefsState>(() =>
     loadPassengerLocationPrefs(me.account.id)
   )
-  const [mobileGpsPromptOpen, setMobileGpsPromptOpen] = useState(false)
+  const [gpsConsentOpen, setGpsConsentOpen] = useState(false)
+  const [reverseLocationLabel, setReverseLocationLabel] = useState<string | null>(null)
+  const [reverseLocationLoading, setReverseLocationLoading] = useState(false)
   const initialGpsRequestDoneRef = useRef(false)
   const db = useMemo(() => getDb(), [])
   const driverById = useMemo(() => new Map(db.drivers.map((d) => [d.id, d])), [db])
@@ -288,6 +304,15 @@ export function OrderPage() {
   }, [me.account.id])
 
   useEffect(() => {
+    const sync = () => {
+      initialGpsRequestDoneRef.current = false
+      setLocationPrefs(loadPassengerLocationPrefs(me.account.id))
+    }
+    window.addEventListener('urbanflow:passenger-location-prefs-updated', sync)
+    return () => window.removeEventListener('urbanflow:passenger-location-prefs-updated', sync)
+  }, [me.account.id])
+
+  useEffect(() => {
     if (initialGpsRequestDoneRef.current) return
     if (!locationPrefs.gps) {
       setGpsLockState('blocked')
@@ -297,12 +322,12 @@ export function OrderPage() {
       setGpsLockState('blocked')
       return
     }
-    if (isMobileFlow && !locationPrefs.gpsPromptSeen) {
-      setMobileGpsPromptOpen(true)
+    if (!locationPrefs.gpsPromptSeen) {
+      setGpsConsentOpen(true)
       return
     }
     requestPassengerGps('initial')
-  }, [isMobileFlow, locationPrefs.gps, locationPrefs.gpsPromptSeen, requestPassengerGps])
+  }, [locationPrefs.gps, locationPrefs.gpsPromptSeen, requestPassengerGps])
 
   useEffect(() => {
     const z = activeZone
@@ -409,11 +434,54 @@ export function OrderPage() {
   }, [])
 
   useEffect(() => {
-    if (!hasSeenMapGuide()) {
-      setMapGuideActive(true)
-      setMapGuideStep(1)
+    if (!hasCompletedPassengerAppTour(me.account.id) || hasSeenMapGuide(me.account.id)) return
+    setMapGuideActive(true)
+    setMapGuideStep(1)
+  }, [me.account.id])
+
+  useEffect(() => {
+    const onTourDone = () => {
+      if (!hasSeenMapGuide(me.account.id)) {
+        setMapGuideActive(true)
+        setMapGuideStep(1)
+      }
     }
+    window.addEventListener(URBANFLOW_PASSENGER_APP_TOUR_COMPLETE, onTourDone)
+    return () => window.removeEventListener(URBANFLOW_PASSENGER_APP_TOUR_COMPLETE, onTourDone)
+  }, [me.account.id])
+
+  useEffect(() => {
+    const expand = () => snapMobileSheet(true)
+    window.addEventListener(URBANFLOW_EXPAND_ORDER_SHEET, expand)
+    return () => window.removeEventListener(URBANFLOW_EXPAND_ORDER_SHEET, expand)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- snapMobileSheet stable for this listener
   }, [])
+
+  useEffect(() => {
+    if (!passengerGps || gpsLockState !== 'ok' || !locationPrefs.gps) {
+      setReverseLocationLabel(null)
+      setReverseLocationLoading(false)
+      return
+    }
+    let cancelled = false
+    setReverseLocationLoading(true)
+    void createLocationFromMapClick(passengerGps.lat, passengerGps.lng)
+      .then((loc) => {
+        if (!cancelled) {
+          setReverseLocationLabel(loc.label || loc.address)
+          setReverseLocationLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setReverseLocationLabel(null)
+          setReverseLocationLoading(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [passengerGps?.lat, passengerGps?.lng, gpsLockState, locationPrefs.gps])
 
   useLayoutEffect(() => {
     if (!mapGuideActive) return
@@ -432,6 +500,13 @@ export function OrderPage() {
     const t = window.setTimeout(scrollToTarget, 200)
     return () => clearTimeout(t)
   }, [mapGuideActive, mapGuideStep, isMobileFlow])
+
+  useEffect(() => {
+    if (!isMobileFlow || !mapGuideActive) return
+    if (mapGuideStep === 2 || mapGuideStep === 3) {
+      snapMobileSheet(true)
+    }
+  }, [isMobileFlow, mapGuideActive, mapGuideStep])
 
   useEffect(() => {
     if (loc.state?.pickup) setPickup(loc.state.pickup)
@@ -586,18 +661,18 @@ export function OrderPage() {
     requestPassengerGps('pickup')
   }
 
-  function allowMobileGpsPrompt() {
+  function allowGpsConsent() {
     const next = { gps: true, gpsPromptSeen: true }
     persistLocationPrefs(next)
-    setMobileGpsPromptOpen(false)
+    setGpsConsentOpen(false)
     requestPassengerGps('initial')
   }
 
-  function denyMobileGpsPrompt() {
+  function denyGpsConsent() {
     persistLocationPrefs({ gps: false, gpsPromptSeen: true })
     setPassengerGps(null)
     setGpsLockState('blocked')
-    setMobileGpsPromptOpen(false)
+    setGpsConsentOpen(false)
   }
 
   function setPickMode(next: 'pickup' | 'destination' | null) {
@@ -675,7 +750,7 @@ export function OrderPage() {
   }, [isMobileFlow, pickup, destination, mapPickTarget])
 
   function completeMapGuide() {
-    setMapGuideSeen()
+    setMapGuideSeen(me.account.id)
     setMapGuideActive(false)
   }
 
@@ -849,16 +924,40 @@ export function OrderPage() {
     }
     return unique
   }, [historyQ.data])
-  const quickDestinations = useMemo(() => {
-    const saved = profileExtras.savedLocations
-    if (!saved) return []
-    const pool = [
-      { id: 'quick-home', label: 'Kuća', address: saved.home },
-      { id: 'quick-work', label: 'Posao', address: saved.work },
+  type QuickDestItem = {
+    id: string
+    label: string
+    address: string
+    requireAddress?: boolean
+  }
+
+  const quickDestinations = useMemo((): QuickDestItem[] => {
+    const saved = profileExtras.savedLocations ?? defaultPassengerSavedLocations()
+    const homeLabel = getGuestLang() === 'en' ? 'Home' : 'Kuća'
+    const workLabel = getGuestLang() === 'en' ? 'Work' : 'Posao'
+    const pool: QuickDestItem[] = [
+      { id: 'quick-home', label: homeLabel, address: saved.home, requireAddress: true },
+      { id: 'quick-work', label: workLabel, address: saved.work, requireAddress: true },
       ...saved.favorites.map((f) => ({ id: `quick-${f.id}`, label: f.name, address: f.address })),
     ]
-    return pool.filter((item) => item.address.trim().length > 0).slice(0, 6)
+    return pool.slice(0, 8)
   }, [profileExtras.savedLocations])
+
+  const handleQuickDestination = useCallback(
+    (item: QuickDestItem) => {
+      if (item.requireAddress && !item.address.trim()) {
+        push(
+          item.id === 'quick-home' ? t.order.quickFillHomeEmpty : t.order.quickFillWorkEmpty,
+          'info'
+        )
+        navigate('/app/profile#saved-places')
+        return
+      }
+      setDestination(toQuickLocation(item))
+    },
+    [navigate, push, t.order.quickFillHomeEmpty, t.order.quickFillWorkEmpty]
+  )
+
   const greeting = useMemo(() => getDayGreeting(me.profile.firstName), [me.profile.firstName])
 
   useLayoutEffect(() => {
@@ -1084,6 +1183,7 @@ export function OrderPage() {
   return (
     <PageContainer className={cn('!py-0', isMobileFlow && 'max-lg:!px-0')}>
       <div
+        data-passenger-tour-target="order"
         className={cn(
           'mx-auto w-full max-w-[1200px] md:px-6 md:py-12 md:pb-12',
           !isMobileFlow && 'px-3 py-2 sm:px-4',
@@ -1175,6 +1275,13 @@ export function OrderPage() {
                     >
                       {t.order.greetingQuestion}
                     </h2>
+                    {locationPrefs.gps && gpsLockState === 'ok' && passengerGps ? (
+                      <p className="text-[10px] font-medium leading-snug text-slate-600">
+                        {reverseLocationLoading
+                          ? t.order.currentLocationLoading
+                          : `${t.order.currentLocation}: ${reverseLocationLabel ?? '…'}`}
+                      </p>
+                    ) : null}
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
                       <span className="inline-flex items-center gap-1 text-xs font-semibold tabular-nums text-slate-700">
                         <CloudSun className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-hidden />
@@ -1226,7 +1333,7 @@ export function OrderPage() {
                           key={item.id}
                           type="button"
                           className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm transition active:scale-[0.98]"
-                          onClick={() => setDestination(toQuickLocation(item))}
+                          onClick={() => handleQuickDestination(item)}
                         >
                           {item.label}
                         </button>
@@ -1246,6 +1353,13 @@ export function OrderPage() {
                 <div className="space-y-0.5">
                   <p className="text-sm font-semibold text-slate-600">{greeting}</p>
                   <h2 className="text-xl font-extrabold text-brand-navy md:text-2xl">{t.order.greetingQuestion}</h2>
+                  {locationPrefs.gps && gpsLockState === 'ok' && passengerGps ? (
+                    <p className="text-sm font-medium text-slate-600">
+                      {reverseLocationLoading
+                        ? t.order.currentLocationLoading
+                        : `${t.order.currentLocation}: ${reverseLocationLabel ?? '…'}`}
+                    </p>
+                  ) : null}
                   <div className="flex items-center gap-2 pt-1 text-xs font-semibold md:hidden">
                     <span className="text-brand-navy">⛅ 14°C</span>
                     <span className={hasDriversGreen ? 'text-emerald-700' : 'text-[#D97706]'}>
@@ -1273,7 +1387,7 @@ export function OrderPage() {
                         key={item.id}
                         type="button"
                         className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-teal/50 hover:text-brand-navy"
-                        onClick={() => setDestination(toQuickLocation(item))}
+                        onClick={() => handleQuickDestination(item)}
                       >
                         {item.label}
                       </button>
@@ -1978,39 +2092,7 @@ export function OrderPage() {
           )
         : null}
 
-      {mobileGpsPromptOpen && typeof document !== 'undefined'
-        ? createPortal(
-            <div
-              className="fixed inset-0 z-[500] flex items-end bg-slate-950/35 px-4 pb-4 backdrop-blur-sm sm:items-center sm:justify-center sm:pb-0"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="mobile-gps-title"
-            >
-              <div className="w-full max-w-md rounded-2xl border border-white/70 bg-white p-5 shadow-2xl">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
-                  <Navigation className="h-5 w-5" aria-hidden />
-                </div>
-                <h2 id="mobile-gps-title" className="text-lg font-extrabold tracking-tight text-brand-navy">
-                  {getGuestLang() === 'en' ? 'Allow GPS location?' : 'Dozvoliti GPS lokaciju?'}
-                </h2>
-                <p className="mt-2 text-sm font-medium leading-relaxed text-slate-600">
-                  {getGuestLang() === 'en'
-                    ? 'UrbanFlow uses your location to set pickup faster, show nearby drivers, and estimate arrival time. If you decline, you can still enter addresses manually.'
-                    : 'UrbanFlow koristi lokaciju za brže postavljanje polazišta, prikaz najbližih vozača i precizniju procjenu dolaska. Ako odbijete, adrese i dalje možete unositi ručno.'}
-                </p>
-                <div className="mt-5 grid gap-3">
-                  <Button type="button" className="w-full" onClick={allowMobileGpsPrompt}>
-                    {getGuestLang() === 'en' ? 'Allow GPS' : 'Dozvoli GPS'}
-                  </Button>
-                  <Button type="button" variant="secondary" className="w-full" onClick={denyMobileGpsPrompt}>
-                    {getGuestLang() === 'en' ? 'Not now' : 'Ne sada'}
-                  </Button>
-                </div>
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      <GpsConsentDialog open={gpsConsentOpen} onAllow={allowGpsConsent} onDeny={denyGpsConsent} />
 
       {!isMobileFlow ? renderRecentRidesSection() : null}
       {!isMobileFlow ? renderScheduledSection() : null}

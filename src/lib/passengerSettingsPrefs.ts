@@ -59,15 +59,25 @@ export function savePassengerPersonalize(accountId: string, p: PassengerPersonal
   localStorage.setItem(passengerLsKey(accountId, 'personalize'), JSON.stringify(p))
 }
 
+export type PassengerSavedLocationsState = {
+  home: string
+  work: string
+  favorites: Array<{ id: string; name: string; address: string }>
+}
+
 export type PassengerProfileExtrasState = {
   city: string
   address: string
   avatarDataUrl?: string
-  savedLocations?: {
-    home: string
-    work: string
-    favorites: Array<{ id: string; name: string; address: string }>
-  }
+  /** Poštanski broj uz kućnu adresu (brza odredišta). */
+  homePostalCode?: string
+  /** Korisnik je zatvorio modal za kućnu adresu pri prvom pokretanju. */
+  homeAddressOnboardingDismissed?: boolean
+  savedLocations?: PassengerSavedLocationsState
+}
+
+export function defaultPassengerSavedLocations(): PassengerSavedLocationsState {
+  return { home: '', work: '', favorites: [] }
 }
 
 export function defaultPassengerProfileExtras(): PassengerProfileExtrasState {
@@ -75,14 +85,23 @@ export function defaultPassengerProfileExtras(): PassengerProfileExtrasState {
     city: '',
     address: '',
     avatarDataUrl: '',
-    savedLocations: {
-      home: 'Ul. Zmaja od Bosne 12, Sarajevo',
-      work: 'Trg djece Sarajeva 5, Sarajevo',
-      favorites: [
-        { id: 'fav-1', name: 'Aerodrom', address: 'Kurta Schorka 36, Sarajevo' },
-        { id: 'fav-2', name: 'BCC', address: 'Branilaca Sarajeva 20, Sarajevo' },
-      ],
-    },
+    homePostalCode: '',
+    homeAddressOnboardingDismissed: false,
+    savedLocations: defaultPassengerSavedLocations(),
+  }
+}
+
+function mergeProfileExtras(
+  base: PassengerProfileExtrasState,
+  raw: Partial<PassengerProfileExtrasState>
+): PassengerProfileExtrasState {
+  const saved = raw.savedLocations
+    ? { ...defaultPassengerSavedLocations(), ...raw.savedLocations }
+    : base.savedLocations
+  return {
+    ...base,
+    ...raw,
+    savedLocations: saved,
   }
 }
 
@@ -90,7 +109,13 @@ export function loadPassengerProfileExtras(accountId: string): PassengerProfileE
   try {
     const r = localStorage.getItem(passengerLsKey(accountId, 'extras'))
     if (!r) return defaultPassengerProfileExtras()
-    return { ...defaultPassengerProfileExtras(), ...JSON.parse(r) }
+    const parsed = JSON.parse(r) as Partial<PassengerProfileExtrasState>
+    const merged = mergeProfileExtras(defaultPassengerProfileExtras(), parsed)
+    /** Postojeći korisnici bez ključa ne vide ponovo modal. */
+    if (parsed.homeAddressOnboardingDismissed === undefined) {
+      return { ...merged, homeAddressOnboardingDismissed: true }
+    }
+    return merged
   } catch {
     return defaultPassengerProfileExtras()
   }
