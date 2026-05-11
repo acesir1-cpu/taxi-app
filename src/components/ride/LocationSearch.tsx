@@ -77,11 +77,10 @@ export function LocationSearch({
       setFloatingStyle(null)
       return
     }
-    const anchor = anchorRef.current
-    if (!anchor) return
-
     const positionList = () => {
-      const r = anchor.getBoundingClientRect()
+      const el = anchorRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
       const vv = window.visualViewport
       const gap = 6
       let spaceBelow: number

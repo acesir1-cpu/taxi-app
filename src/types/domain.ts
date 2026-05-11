@@ -4,6 +4,7 @@ export type RideRequestStatus =
   | 'kreiran'
   | 'u_obradi'
   | 'dodijeljen'
+  | 'prihvacen'
   | 'otkazan'
   | 'neuspjesan'
 
@@ -15,6 +16,7 @@ export type RideStatus =
   | 'zavrsena'
   | 'otkazana'
   | 'neuspjesna'
+  | 'problematicna'
 
 export type ComplaintStatus = 'zaprimljena' | 'u_obradi' | 'rijesena' | 'odbijena' | 'nepotpuna'
 
@@ -39,7 +41,7 @@ export type ComplaintCategory =
   | 'naplata'
   | 'drugo'
 
-export type UserRole = 'putnik' | 'vozac'
+export type UserRole = 'putnik' | 'vozac' | 'dispecer'
 
 export interface UserAccount {
   id: string
@@ -260,6 +262,7 @@ export interface DriverUiState {
 export type AuthSession =
   | { kind: 'passenger'; account: UserAccount; profile: PassengerProfile }
   | { kind: 'driver'; account: UserAccount; driverProfile: DriverUserProfile }
+  | { kind: 'dispatcher'; account: UserAccount }
 
 export interface Location {
   id: string
