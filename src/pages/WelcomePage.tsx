@@ -130,7 +130,7 @@ export function WelcomePage() {
         </div>
       </div>
 
-      <div className="welcome-feature-grid">
+      <div className="welcome-feature-grid md:hidden">
         {featureItems.map(({ icon: Icon, title, body }) => (
           <div key={title} className="welcome-feature-item">
             <span className="welcome-feature-icon" aria-hidden>

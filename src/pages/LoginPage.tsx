@@ -17,35 +17,34 @@ import { buildLoginSchema, type LoginFormValues } from '../schemas/auth'
 import { googleLogin, login } from '../services/authApi'
 import { useToastStore } from '../store/notificationStore'
 import { GoogleGIcon } from '../components/icons/GoogleGIcon'
-import { cn } from '../lib/utils'
 import { AuthInput, PrimaryButton, SecondaryButton, RoleToggle, Field, Divider } from '../components/auth/authPrimitives'
 
 type AuthMode = 'passenger' | 'driver'
 
-type DemoAccount = {
-  id: AuthMode
-  initials: string
-  fullName: string
-  rolePill: string
-  email: string
-  password: string
+function demoLoginValues(mode: AuthMode): LoginFormValues {
+  return mode === 'passenger'
+    ? { identifier: DEMO_PASSENGER_EMAIL, password: DEMO_PASSENGER_PASSWORD }
+    : { identifier: DEMO_DRIVER_EMAIL, password: DEMO_DRIVER_PASSWORD }
 }
 
 export function LoginPage() {
   useLangRefresh()
   const t = strings()
+  const loginSchema = useMemo(() => buildLoginSchema(t), [t])
   const [authMode, setAuthMode] = useState<AuthMode>('passenger')
   const [showPwd, setShowPwd] = useState(false)
-  const [revealedDemo, setRevealedDemo] = useState<AuthMode | null>(null)
-  const loginSchema = useMemo(() => buildLoginSchema(t), [t])
   const navigate = useNavigate()
   const [sp] = useSearchParams()
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { identifier: '', password: '' },
+    defaultValues: demoLoginValues('passenger'),
   })
+
+  useEffect(() => {
+    form.reset(demoLoginValues(authMode))
+  }, [authMode, form])
 
   const mut = useMutation({
     mutationFn: (v: LoginFormValues) => login(v.identifier, v.password),
@@ -83,31 +82,6 @@ export function LoginPage() {
       googleMut.mutate()
     }
   }, [sp, googleMut])
-
-  const demoAccounts: DemoAccount[] = [
-    {
-      id: 'passenger',
-      initials: 'LH',
-      fullName: 'Lejla Hasanović',
-      rolePill: t.auth.passengerMode.toLowerCase(),
-      email: DEMO_PASSENGER_EMAIL,
-      password: DEMO_PASSENGER_PASSWORD,
-    },
-    {
-      id: 'driver',
-      initials: 'AK',
-      fullName: 'Amir K.',
-      rolePill: t.auth.driverMode.toLowerCase(),
-      email: DEMO_DRIVER_EMAIL,
-      password: DEMO_DRIVER_PASSWORD,
-    },
-  ]
-
-  function fillFromDemo(d: DemoAccount) {
-    setAuthMode(d.id)
-    form.setValue('identifier', d.email, { shouldValidate: true })
-    form.setValue('password', d.password, { shouldValidate: true })
-  }
 
   const submitting = mut.isPending || googleMut.isPending
 
@@ -184,28 +158,6 @@ export function LoginPage() {
           <span className="truncate">{t.auth.googleSim}</span>
         </SecondaryButton>
 
-        {!import.meta.env.PROD ? (
-          <div className="mt-4 rounded-xl border border-[#E5E7EB] bg-[#F9FAFB] px-3 py-3">
-            <p
-              className="mb-2 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#9CA3AF]"
-            >
-              {t.auth.demoSectionLabel}
-            </p>
-            <div className="flex flex-col gap-1.5">
-              {demoAccounts.map((d) => (
-                <DemoRow
-                  key={d.id}
-                  demo={d}
-                  revealed={revealedDemo === d.id}
-                  onToggleReveal={() => setRevealedDemo((cur) => (cur === d.id ? null : d.id))}
-                  onSelect={() => fillFromDemo(d)}
-                  disabled={submitting}
-                />
-              ))}
-            </div>
-          </div>
-        ) : null}
-
         <p className="text-center" style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>
           {t.auth.noAccountPrompt}{' '}
           <Link
@@ -245,85 +197,3 @@ const PasswordInput = React.forwardRef<
     </div>
   )
 })
-
-function DemoRow({
-  demo,
-  revealed,
-  onToggleReveal,
-  onSelect,
-  disabled,
-}: {
-  demo: DemoAccount
-  revealed: boolean
-  onToggleReveal: () => void
-  onSelect: () => void
-  disabled?: boolean
-}) {
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-2 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-white/80',
-      )}
-      style={{ minHeight: 40 }}
-    >
-      <button
-        type="button"
-        onClick={onSelect}
-        disabled={disabled}
-        className="flex flex-1 items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-60"
-        aria-label={`${demo.fullName} (${demo.rolePill})`}
-      >
-        <span
-          aria-hidden
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
-          style={{
-            background: '#F3F4F6',
-            color: '#374151',
-            fontSize: 12,
-            fontWeight: 700,
-          }}
-        >
-          {demo.initials}
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="flex items-center gap-2">
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
-              {demo.fullName}
-            </span>
-            <span
-              style={{
-                fontSize: 10,
-                fontWeight: 500,
-                color: '#6B7280',
-                background: '#F3F4F6',
-                borderRadius: 6,
-                padding: '1px 6px',
-              }}
-            >
-              {demo.rolePill}
-            </span>
-          </span>
-          <span className="flex items-center gap-2">
-            <span style={{ fontSize: 11, color: '#9CA3AF' }} className="truncate">
-              {demo.email}
-            </span>
-            <span aria-hidden style={{ color: '#D1D5DB' }}>
-              ·
-            </span>
-            <span style={{ fontSize: 11, color: '#9CA3AF' }}>
-              {revealed ? demo.password : '••••••••'}
-            </span>
-          </span>
-        </span>
-      </button>
-      <button
-        type="button"
-        onClick={onToggleReveal}
-        aria-label={revealed ? 'Sakrij lozinku' : 'Prikaži lozinku'}
-        className="rounded-md p-1.5 text-[#9CA3AF] transition-colors hover:text-[#6B7280]"
-      >
-        {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-      </button>
-    </div>
-  )
-}
