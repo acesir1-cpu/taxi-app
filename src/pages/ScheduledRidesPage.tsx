@@ -323,6 +323,7 @@ function scheduledRequestStatusBadgeClass(status: RideRequestStatus): string {
   const base =
     'inline-flex max-w-[100%] shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-tight tracking-normal'
   switch (status) {
+    case 'prihvacen':
     case 'dodijeljen':
       return `${base} bg-emerald-100 text-emerald-800`
     case 'otkazan':

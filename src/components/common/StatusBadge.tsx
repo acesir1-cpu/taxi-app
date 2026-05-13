@@ -10,6 +10,7 @@ const map: Record<RideStatus, 'default' | 'success' | 'warning' | 'danger'> = {
   zavrsena: 'success',
   otkazana: 'danger',
   neuspjesna: 'danger',
+  problematicna: 'danger',
 }
 
 export function RideStatusBadge({ status }: { status: RideStatus }) {
@@ -22,6 +23,7 @@ export function RideStatusBadge({ status }: { status: RideStatus }) {
     zavrsena: t.ride.status.zavrsena,
     otkazana: t.ride.status.otkazana,
     neuspjesna: t.ride.status.neuspjesna,
+    problematicna: t.ride.status.problematicna,
   }
   return (
     <Badge variant={map[status]} className="rounded-md border-0 px-2 py-0.5 text-[10px] font-semibold leading-tight">
