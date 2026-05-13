@@ -34,4 +34,4 @@ React 19, TypeScript, Vite 8, Tailwind CSS, TanStack Query, Zustand, Zod, React 
 
 ## Napomena
 
-Ovo je isključivo frontend demonstracija — nema pravog SMS-a, plaćanja ni serverskog API-ja. Rute i podaci su mock / lokalni ili preko simuliranih servisa.
+Ovo je isključivo frontend demonstracija, nema pravog SMS-a, plaćanja ni serverskog API-ja. Rute i podaci su mock / lokalni ili preko simuliranih servisa.
