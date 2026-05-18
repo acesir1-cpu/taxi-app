@@ -49,6 +49,7 @@ export function DispatcherProblemsPage() {
   })
 
   if (isPending && !data) return <LoadingState />
+  if (!data) return <LoadingState />
 
   const problemRides = data.rides.filter((row) =>
     ['problematicna', 'neuspjesna', 'neuspjesan', 'otkazana', 'otkazan'].includes(row.status),

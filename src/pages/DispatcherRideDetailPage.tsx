@@ -112,6 +112,7 @@ export function DispatcherRideDetailPage() {
   })
 
   if (isPending && !data) return <LoadingState />
+  if (!data) return <LoadingState />
   if (!row) {
     return (
       <Card className={passengerAppCardClassName}>

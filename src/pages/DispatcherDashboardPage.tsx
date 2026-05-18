@@ -70,6 +70,7 @@ export function DispatcherDashboardPage() {
   }, [data, filter])
 
   if (isPending && !data) return <LoadingState />
+  if (!data) return <LoadingState />
 
   const openAnomalies = data.anomalies.filter((item) => !item.acknowledged)
   const liveLabel = c.liveAt.replace('{time}', formatDispatchDateTime(data.generatedAt))

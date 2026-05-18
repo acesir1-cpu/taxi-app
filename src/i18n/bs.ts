@@ -2,8 +2,11 @@ export const bs = {
   brand: 'UrbanFlow Taxi',
   welcome: {
     title: 'Gdje idemo danas?',
+    titlePart2: 'Stigni na vrijeme.',
+    titleMobile: 'Gdje idemo danas?',
     subtitle:
       'AI asistent prepoznaje tvoj ritam. Izbjegni gužvu na Pofalićima i stigni na vrijeme.',
+    formEyebrow: 'Tvoj AI asistent u gradu',
     trustSignal: '',
     orDivider: 'ili',
     loginHelper: 'Brzo i jednostavno',
@@ -49,6 +52,85 @@ export const bs = {
     featureCoverageTitle: 'Uvijek pri ruci',
     featureCoverageBody:
       'Naruči jednim klikom s laptopa na fakultetu ili u pokretu preko telefona.',
+    manifestoLabel: 'Zašto UrbanFlow, a ne još jedna taksi aplikacija',
+    manifestoBody:
+      'UrbanFlow nije kopija stranog Ubera — napravljen je za ritam Sarajeva: tramvaj koji blokira most, mahalu koja ne prima svaki auto i gužvu u petak kod Skenderije. Naša AI ne “optimizira svijet”; uči tvoj grad, štiti tvoju cijenu i poštuje ljude koji ga voze svaki dan.',
+    manifestoTagline: 'Sarajevo · pokretano lokalnim povjerenjem',
+    aiEstimate: {
+      ariaLabel: 'AI procjena dolaska',
+      label: 'AI procjena',
+      summary: '4 min · Titova ruta · fiksna cijena',
+    },
+    orderPreview: {
+      ariaLabel: 'Pregled narudžbe',
+      cardTitle: 'Tvoja vožnja',
+      liveBadge: 'LIVE',
+      pickupLabel: 'Polazište',
+      pickup: 'Baščaršija',
+      destinationLabel: 'Odredište',
+      destination: 'Ilidža',
+      etaLabel: 'Dolazak',
+      eta: '4 min',
+      priceLabel: 'Cijena',
+      price: '8,50 KM',
+      status: 'Vozač na putu',
+    },
+    landingSections: {
+      pulse: {
+        eyebrow: 'Contextual AI Pulse',
+        title: 'Kako UrbanFlow misli tri koraka ispred tebe',
+        subtitle:
+          'Ne čeka gužvu — predviđa je. Svaki modul uči sarajevske obrasce prometa u realnom vremenu.',
+        cards: [
+          {
+            title: 'Jutarnja Špica',
+            badge: 'Tram & Traffic Sync',
+            body: 'AI prati mostove na Miljacki i uska grla kod Skenderije. Prije nego uđeš u zastoj, preusmjeri te preko obilaznice i tranzitnog koridora — bez “sjedanja” na Titovoj.',
+          },
+          {
+            title: 'Zimske Mahale',
+            badge: 'Mahala Engine',
+            body: 'Filtrira vozila za strme padine — Vratnik, Bistrik, Sedrenik — kad padne snijeg. Spaja te s vozačima koji znaju zimsku vožnju, ne sa onima koji se vraćaju nizbrdo u panici.',
+          },
+          {
+            title: 'Sarajevo Noću & SFF',
+            badge: 'Fair Event Mode',
+            body: 'Prepoznaje dinamiku grada: Sarajevo Film Festival, utakmice na Koševu, koncerti. Raspoređuje vozače fer, bez predatorskog skakanja cijene kad grad “gori”.',
+          },
+        ],
+      },
+      trust: {
+        eyebrow: 'Pošteno i Naše',
+        title: 'Fer odnos između putnika i vozača',
+        narrative:
+          'UrbanFlow se zasniva na sarajevskom gostoprimstvu. Fiksne cijene garantuju fer odnos: vozač je tačno plaćen za trud, a putnik ne strepi od taksimetra u gužvi.',
+        passengerLabel: 'Za putnike',
+        driverLabel: 'Za vozače',
+        testimonials: [
+          {
+            role: 'Lejla, 31',
+            quote:
+              'Konačno znam koliko ću platiti prije nego sjednem. Nema nervoze na taksimetru, nema rasprave o kusuru — samo mirna vožnja do posla.',
+          },
+          {
+            role: 'Mirza, 45',
+            quote:
+              'AI me ne drži satima na Titovoj da “čekam sreću”. Dobijam fer vožnje, poštovanje starijih kolega i rutu koja ima smisla — kao lokalni taksi treba.',
+          },
+        ],
+      },
+      cta: {
+        title: 'Vrijeme je za pametnije kretanje kroz grad.',
+        subtitle:
+          'Nemoj pristajati na aplikacije koje ne razlikuju Maltu od Čengić Vile. Preuzmi asistenta koji diše u ritmu Sarajeva.',
+        interactivePlaceholder:
+          'Preuzmi aplikaciju i provjeri koliko ti treba do Baščaršije upravo sada.',
+        qrLabel: 'Skeniraj za preuzimanje',
+        qrPlaceholder: 'QR kod uskoro',
+        qrScanHint: 'Skeniraj telefonom za brzu instalaciju',
+        startWeb: 'Započni vožnju u browseru',
+      },
+    },
     footerVersion: 'v3.1 | Ponosno razvijeno za ulice Sarajeva.',
   },
   auth: {

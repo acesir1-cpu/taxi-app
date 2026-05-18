@@ -3,8 +3,11 @@ export const en = {
   brand: 'UrbanFlow Taxi',
   welcome: {
     title: 'Where are we headed today?',
+    titlePart2: 'Arrive on time.',
+    titleMobile: 'Where are we headed today?',
     subtitle:
       'The AI assistant learns your rhythm. Skip the Pofalići rush and arrive on time.',
+    formEyebrow: 'Your AI companion in the city',
     trustSignal: '',
     orDivider: 'or',
     loginHelper: 'Quick and simple',
@@ -50,6 +53,85 @@ export const en = {
     featureCoverageTitle: 'Always within reach',
     featureCoverageBody:
       'Book in one tap from your laptop on campus or on the go from your phone.',
+    manifestoLabel: 'Why UrbanFlow, not another taxi app',
+    manifestoBody:
+      'UrbanFlow isn’t another imported taxi clone — it’s built for Sarajevo’s rhythm: trams blocking bridges, mahalas that reject the wrong car, Friday gridlock at Skenderija. Our AI doesn’t “optimize the world”; it learns your city, protects your price, and respects the people who drive it every day.',
+    manifestoTagline: 'Sarajevo · powered by local trust',
+    aiEstimate: {
+      ariaLabel: 'AI arrival estimate',
+      label: 'AI estimate',
+      summary: '4 min · Titova route · fixed fare',
+    },
+    orderPreview: {
+      ariaLabel: 'Order preview',
+      cardTitle: 'Your ride',
+      liveBadge: 'LIVE',
+      pickupLabel: 'Pickup',
+      pickup: 'Baščaršija',
+      destinationLabel: 'Drop-off',
+      destination: 'Ilidža',
+      etaLabel: 'Arrival',
+      eta: '4 min',
+      priceLabel: 'Fare',
+      price: '8.50 BAM',
+      status: 'Driver en route',
+    },
+    landingSections: {
+      pulse: {
+        eyebrow: 'Contextual AI Pulse',
+        title: 'How UrbanFlow thinks three steps ahead',
+        subtitle:
+          'It doesn’t wait for traffic — it predicts it. Each module learns Sarajevo’s traffic patterns in real time.',
+        cards: [
+          {
+            title: 'Morning Rush',
+            badge: 'Tram & Traffic Sync',
+            body: 'AI watches bridges on Miljacka and bottlenecks near Skenderija. Before you sit in gridlock, it reroutes you via bypass and transit corridors — no “parking” on Titova.',
+          },
+          {
+            title: 'Winter Mahalas',
+            badge: 'Mahala Engine',
+            body: 'Filters vehicles for steep hills — Vratnik, Bistrik, Sedrenik — when snow falls. Pairs you with drivers who know winter driving, not ones sliding downhill in panic.',
+          },
+          {
+            title: 'Sarajevo at Night & SFF',
+            badge: 'Fair Event Mode',
+            body: 'Reads the city’s rhythm: Sarajevo Film Festival, matches at Koševo, concerts. Dispatches drivers fairly, without predatory surge pricing when the city is buzzing.',
+          },
+        ],
+      },
+      trust: {
+        eyebrow: 'Fair & Local',
+        title: 'A fair deal between rider and driver',
+        narrative:
+          'UrbanFlow is built on Sarajevo hospitality. Fixed fares guarantee fairness: drivers are paid properly for the effort, riders aren’t anxious about the meter in traffic.',
+        passengerLabel: 'For riders',
+        driverLabel: 'For drivers',
+        testimonials: [
+          {
+            role: 'Lejla, 31',
+            quote:
+              'I finally know what I’ll pay before I get in. No meter anxiety, no change arguments — just a calm ride to work.',
+          },
+          {
+            role: 'Mirza, 45',
+            quote:
+              'AI doesn’t keep me on Titova for hours “waiting for luck”. I get fair rides, respect from senior colleagues, and routes that make sense — like a local taxi should.',
+          },
+        ],
+      },
+      cta: {
+        title: 'Time for smarter movement through the city.',
+        subtitle:
+          'Don’t settle for apps that can’t tell Malta from Čengić Vila. Get an assistant that breathes Sarajevo’s rhythm.',
+        interactivePlaceholder:
+          'Download the app and see how long it takes to reach Baščaršija right now.',
+        qrLabel: 'Scan to download',
+        qrPlaceholder: 'QR code coming soon',
+        qrScanHint: 'Scan with your phone for a quick install',
+        startWeb: 'Start your ride in the browser',
+      },
+    },
     footerVersion: 'v3.1 | Proudly built for the streets of Sarajevo.',
   },
   auth: {

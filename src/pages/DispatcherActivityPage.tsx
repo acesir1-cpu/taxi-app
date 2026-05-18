@@ -8,7 +8,6 @@ import { useDispatchData } from '../hooks/useDispatchSnapshot'
 import { useLangRefresh } from '../hooks/useLangRefresh'
 import { strings } from '../i18n/strings'
 import { cn } from '../lib/utils'
-import { useDispatcherSession } from '../hooks/useDispatcherSession'
 import type { DispatchLogKind } from '../types/domain'
 
 const kinds: Array<DispatchLogKind | 'sve'> = ['sve', 'auth', 'ride', 'driver', 'complaint', 'anomaly', 'rbac', 'note', 'system']
@@ -19,7 +18,6 @@ export function DispatcherActivityPage() {
   const a = t.dispatcher.activity
   const logKind = t.dispatcher.logKind
   const c = t.dispatcher.common
-  const { me } = useDispatcherSession()
   const [kind, setKind] = useState<DispatchLogKind | 'sve'>('sve')
   const [query, setQuery] = useState('')
   const { data, isPending } = useDispatchData()

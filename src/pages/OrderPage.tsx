@@ -15,7 +15,6 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Briefcase,
-  Car,
   ChevronRight,
   CloudSun,
   Crosshair,
@@ -1011,7 +1010,6 @@ export function OrderPage() {
     }
   }, [isMobileFlow, quickDestinations.length, greeting, displayedNearbyCount, t.order.quickTo])
 
-  const na = t.order.notAvailable
   const baseConfirmDisabled =
     !route || !!activeQ.data || mut.isPending || sameLocationByDistance
   const scheduleBlocksConfirm = orderType === 'zakazano' && !isFutureScheduleValue(scheduledLocal)
