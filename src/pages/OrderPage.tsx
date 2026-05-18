@@ -14,10 +14,12 @@ import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
+  Briefcase,
   Car,
   ChevronRight,
   CloudSun,
   Crosshair,
+  Home,
   Loader2,
   Map as MapIcon,
   Maximize2,
@@ -30,7 +32,11 @@ import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
 import { getGuestLang } from '../i18n/guestLocale'
 import type { AppOutletContext } from '../types/appContext'
-import type { Location, OrderType } from '../types/domain'
+import type { Location, OrderType, RideRequest, RideStatus } from '../types/domain'
+import { rideRequestStatusLabel, rideStatusLabel, rideStatusToneClass } from '../lib/passengerStatusLabels'
+import { OrderAiSidebarTip } from '../components/order/OrderAiSidebarTip'
+import { OrderEstimateAiSection } from '../components/order/OrderEstimateAiSection'
+import { useAiRouteEstimate } from '../hooks/useAiRouteEstimate'
 import { calculateRoute, createLocationFromMapClick, isInServiceZone } from '../services/locationApi'
 import { hasCompletedPassengerAppTour } from '../lib/passengerAppTourStorage'
 import {
@@ -44,6 +50,7 @@ import {
 import { useToastStore } from '../store/notificationStore'
 import { LocationSearch } from '../components/ride/LocationSearch'
 import { PickupDestinationFields } from '../components/ride/PickupDestinationFields'
+import { ScheduledRideCancelButton } from '../components/ride/ScheduledRideCancelButton'
 import { MapChunkFallback } from '../components/map/MapChunkFallback'
 import type { RouteMapHandle } from '../components/map/RouteMap'
 
@@ -171,6 +178,7 @@ export function OrderPage() {
   const isMobileFlow = useIsMobileOrderFlow()
   const [sameLocationError, setSameLocationError] = useState(false)
   const [scheduleInputError, setScheduleInputError] = useState(false)
+  const [scheduledCancelConfirm, setScheduledCancelConfirm] = useState<RideRequest | null>(null)
   const historyPrefs = getHistoryPrivacyPrefs(me.account.id)
   const [profileExtrasNonce, setProfileExtrasNonce] = useState(0)
   useEffect(() => {
@@ -536,6 +544,18 @@ export function OrderPage() {
     queryFn: () => getScheduledRideRequests(me.profile.id),
   })
 
+  const scheduledCancelMut = useMutation({
+    mutationFn: (requestId: string) => cancelRideRequest(requestId, me.account.id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['scheduledRequests', me.profile.id] })
+      push(t.notifications.rideCancelled, 'success')
+      setScheduledCancelConfirm(null)
+    },
+    onError: () => {
+      push(`${t.common.error} ${t.common.retry}`, 'error')
+    },
+  })
+
   const mut = useMutation({
     mutationFn: async () => {
       if (!pickup || !destination) throw new Error('missing')
@@ -601,6 +621,15 @@ export function OrderPage() {
 
   const route = routeQuery.data && !('error' in routeQuery.data) ? routeQuery.data : null
   const routeErr = routeQuery.data && 'error' in routeQuery.data ? routeQuery.data.error : null
+  const scheduledAtIso =
+    orderType === 'zakazano' && scheduledLocal ? new Date(scheduledLocal).toISOString() : undefined
+  const passengerAiQ = useAiRouteEstimate(pickup ?? undefined, destination ?? undefined, {
+    availableDrivers: displayedNearbyCount,
+    orderType,
+    scheduledAt: scheduledAtIso,
+  })
+  const passengerAiEstimate =
+    passengerAiQ.data && !('error' in passengerAiQ.data) ? passengerAiQ.data : null
   const sameLocationByDistance = !!pickup && !!destination && haversineKm(pickup, destination) < 0.05
 
   useEffect(() => {
@@ -929,15 +958,19 @@ export function OrderPage() {
     label: string
     address: string
     requireAddress?: boolean
+    icon?: 'home' | 'work'
   }
+
+  const quickDestButtonClass =
+    'inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-100 active:scale-[0.98]'
 
   const quickDestinations = useMemo((): QuickDestItem[] => {
     const saved = profileExtras.savedLocations ?? defaultPassengerSavedLocations()
     const homeLabel = getGuestLang() === 'en' ? 'Home' : 'Kuća'
     const workLabel = getGuestLang() === 'en' ? 'Work' : 'Posao'
     const pool: QuickDestItem[] = [
-      { id: 'quick-home', label: homeLabel, address: saved.home, requireAddress: true },
-      { id: 'quick-work', label: workLabel, address: saved.work, requireAddress: true },
+      { id: 'quick-home', label: homeLabel, address: saved.home, requireAddress: true, icon: 'home' },
+      { id: 'quick-work', label: workLabel, address: saved.work, requireAddress: true, icon: 'work' },
       ...saved.favorites.map((f) => ({ id: `quick-${f.id}`, label: f.name, address: f.address })),
     ]
     return pool.slice(0, 8)
@@ -1039,7 +1072,10 @@ export function OrderPage() {
             {buildRecentRideCards(historyQ.data ?? []).map((r) => {
               const driver = r.driverId ? driverById.get(r.driverId) : undefined
               const vehicle = r.vehicleId ? vehicleById.get(r.vehicleId) : undefined
-              const statusMeta = getRideStatusMeta(r.status)
+              const statusMeta = {
+                label: rideStatusLabel(r.status as RideStatus, t.ride.status),
+                toneClass: rideStatusToneClass(r.status as RideStatus),
+              }
               const hasDriverOrCar = !!driver || !!vehicle
               return (
                 <div
@@ -1156,20 +1192,15 @@ export function OrderPage() {
                       : t.order.notAvailable}
                   </p>
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-brand-teal">{request.status}</span>
-                    <Button
-                      type="button"
-                      variant="outlineThin"
-                      size="sm"
-                      className="h-8 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
-                      onClick={async () => {
-                        await cancelRideRequest(request.id, me.account.id)
-                        await qc.invalidateQueries({ queryKey: ['scheduledRequests', me.profile.id] })
-                        push(t.notifications.rideCancelled, 'success')
-                      }}
-                    >
-                      {t.ride.cancel}
-                    </Button>
+                    <span className="text-xs font-semibold text-brand-teal">
+                      {rideRequestStatusLabel(request.status, t.order.scheduledRequestStatus)}
+                    </span>
+                    <ScheduledRideCancelButton
+                      label={t.ride.cancel}
+                      disabled={scheduledCancelMut.isPending}
+                      className="h-9 shrink-0 px-3 text-xs"
+                      onClick={() => setScheduledCancelConfirm(request)}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -1321,7 +1352,7 @@ export function OrderPage() {
                         className="mt-1 w-full rounded-lg bg-slate-100/90 px-2 py-1 text-left text-[10px] font-medium text-slate-600 transition hover:bg-slate-100"
                         onClick={() => setLocationHintDismissed(true)}
                       >
-                        {t.order.locationOptionalHint}
+                        {t.order.locationOptionalHintMobile}
                       </button>
                     ) : null}
                   </header>
@@ -1332,9 +1363,14 @@ export function OrderPage() {
                         <button
                           key={item.id}
                           type="button"
-                          className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 shadow-sm transition active:scale-[0.98]"
+                          className={cn(quickDestButtonClass, 'h-8 py-1.5')}
                           onClick={() => handleQuickDestination(item)}
                         >
+                          {item.icon === 'home' ? (
+                            <Home className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+                          ) : item.icon === 'work' ? (
+                            <Briefcase className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+                          ) : null}
                           {item.label}
                         </button>
                       ))}
@@ -1386,9 +1422,14 @@ export function OrderPage() {
                       <button
                         key={item.id}
                         type="button"
-                        className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-brand-teal/50 hover:text-brand-navy"
+                        className={quickDestButtonClass}
                         onClick={() => handleQuickDestination(item)}
                       >
+                        {item.icon === 'home' ? (
+                          <Home className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+                        ) : item.icon === 'work' ? (
+                          <Briefcase className="h-3.5 w-3.5 shrink-0 text-slate-500" aria-hidden />
+                        ) : null}
                         {item.label}
                       </button>
                     ))}
@@ -1401,6 +1442,7 @@ export function OrderPage() {
                 <p className="text-3xl font-extrabold text-brand-navy">⛅ 14°C</p>
                 <p className="text-base font-semibold text-slate-700">{t.order.weatherSummary}</p>
                 <p className="text-sm font-semibold text-slate-600">{userClock}</p>
+                <OrderAiSidebarTip estimate={passengerAiEstimate} fallback={t.order.weatherAiTip} />
                 <p className={cn('text-base font-semibold', hasDriversGreen ? 'text-emerald-700' : 'text-[#D97706]')}>
                   ● {displayedNearbyCount} {t.order.driversNearby}
                 </p>
@@ -1495,7 +1537,7 @@ export function OrderPage() {
                       className={cn(
                         'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
                         orderType === 'odmah'
-                          ? 'bg-yellow-400 font-bold text-slate-900 shadow-[0_8px_18px_rgba(234,179,8,0.26)] hover:scale-[1.02]'
+                          ? 'bg-brand-yellow font-bold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.28)] hover:bg-brand-yellow-dark hover:scale-[1.02]'
                           : 'bg-transparent text-slate-600 hover:bg-white/60 hover:text-brand-navy'
                       )}
                       onClick={() => {
@@ -1511,7 +1553,7 @@ export function OrderPage() {
                         'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-transform transition-[color,background-color,box-shadow] duration-150 ease-out',
                         orderType === 'zakazano'
                           ? 'bg-brand-navy text-white shadow-sm'
-                          : 'bg-transparent text-slate-600 hover:bg-white/60 hover:text-brand-navy'
+                          : 'bg-transparent text-slate-700 hover:bg-white/80 hover:text-brand-navy'
                       )}
                       onClick={() => setOrderType('zakazano')}
                     >
@@ -1593,28 +1635,16 @@ export function OrderPage() {
                     </p>
                   </div>
                 ) : null}
-                {route ? (
-                  <>
-                    <Row
-                      label={t.order.estimate}
-                      value={`${route.estimatedPrice.toFixed(2)} ${t.order.bam}`}
-                      emphasize
-                    />
-                    <Row label={t.order.distance} value={`${route.distanceKm.toFixed(2)} ${t.order.km}`} />
-                    <Row label={t.order.eta} value={`~${route.durationMin} ${t.order.min}`} />
-                    <Row label={t.order.payment} value={t.order.cash} />
-                  </>
-                ) : (
-                  <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4">
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-yellow-100 text-slate-700">
-                      <Car className="h-5 w-5" aria-hidden />
-                    </span>
-                    <div className="space-y-0.5">
-                      <p className="text-sm font-semibold text-brand-navy">{t.order.waitingRouteSelection}</p>
-                      <p className="text-xs font-medium text-slate-500">{na}</p>
-                    </div>
-                  </div>
-                )}
+                <OrderEstimateAiSection
+                  pickup={pickup}
+                  destination={destination}
+                  orderType={orderType}
+                  scheduledAt={scheduledAtIso}
+                  nearbyDrivers={displayedNearbyCount}
+                  routeFallback={route}
+                  routeLoading={routeQuery.isFetching}
+                />
+                {pickup && destination ? <Row label={t.order.payment} value={t.order.cash} /> : null}
               </CardContent>
             </Card>
             <ConfirmBlock
@@ -1792,7 +1822,7 @@ export function OrderPage() {
                               className={cn(
                                 'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
                                 orderType === 'odmah'
-                                  ? 'bg-yellow-400 font-bold text-slate-900 shadow-[0_8px_18px_rgba(234,179,8,0.26)]'
+                                  ? 'bg-brand-yellow font-bold text-brand-navy shadow-[0_8px_18px_rgba(245,166,35,0.28)] hover:bg-brand-yellow-dark'
                                   : 'bg-transparent text-slate-600'
                               )}
                               onClick={() => {
@@ -1808,7 +1838,7 @@ export function OrderPage() {
                                 'flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-150 ease-out',
                                 orderType === 'zakazano'
                                   ? 'bg-brand-navy text-white shadow-sm'
-                                  : 'bg-transparent text-slate-600'
+                                  : 'bg-transparent text-slate-700 hover:bg-white/80 hover:text-brand-navy'
                               )}
                               onClick={() => setOrderType('zakazano')}
                             >
@@ -1848,27 +1878,15 @@ export function OrderPage() {
                             ) : null}
                           </div>
                         ) : null}
-                        {hasBothLocations && route ? (
-                          <>
-                            <Row
-                              label={t.order.estimate}
-                              value={`${route.estimatedPrice.toFixed(2)} ${t.order.bam}`}
-                              emphasize
-                            />
-                            <Row label={t.order.distance} value={`${route.distanceKm.toFixed(2)} ${t.order.km}`} />
-                            <Row label={t.order.eta} value={`~${route.durationMin} ${t.order.min}`} />
-                          </>
-                        ) : (
-                          <div className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
-                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-slate-700">
-                              <Car className="h-4 w-4" aria-hidden />
-                            </span>
-                            <div className="space-y-0.5">
-                              <p className="text-sm font-semibold text-brand-navy">Čekamo odabir rute...</p>
-                              <p className="text-xs font-medium text-slate-500">{na}</p>
-                            </div>
-                          </div>
-                        )}
+                        <OrderEstimateAiSection
+                          pickup={pickup}
+                          destination={destination}
+                          orderType={orderType}
+                          scheduledAt={scheduledAtIso}
+                          nearbyDrivers={displayedNearbyCount}
+                          routeFallback={route}
+                          routeLoading={routeQuery.isFetching}
+                        />
                       </CardContent>
                     </Card>
                     </div>
@@ -2114,6 +2132,46 @@ export function OrderPage() {
         onStepChange={setMapGuideStep}
         onComplete={completeMapGuide}
       />
+
+      {scheduledCancelConfirm ? (
+        <div className="fixed inset-0 z-[150] grid place-items-center bg-black/45 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-brand-navy">{t.ride.cancel}</h3>
+            <p className="mt-2 text-sm text-slate-700">
+              {scheduledCancelConfirm.pickup.label} → {scheduledCancelConfirm.destination.label}
+            </p>
+            <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+              {t.history.deleteRideWarning}
+            </p>
+            <p className="mt-2 text-xs text-slate-500">{t.order.scheduledManageDesc}</p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={() => setScheduledCancelConfirm(null)}
+              >
+                {t.common.close}
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                className="w-full"
+                disabled={scheduledCancelMut.isPending}
+                onClick={() => scheduledCancelMut.mutate(scheduledCancelConfirm.id)}
+              >
+                {t.ride.confirmCancelRide}
+              </Button>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="absolute inset-0 -z-10"
+            aria-label={t.common.close}
+            onClick={() => setScheduledCancelConfirm(null)}
+          />
+        </div>
+      ) : null}
       </div>
     </PageContainer>
   )
@@ -2155,31 +2213,6 @@ function formatRideDateTime(iso: string): string {
     minute: '2-digit',
     hour12: false,
   })
-}
-
-function getRideStatusMeta(status: string): { label: string; toneClass: string } {
-  if (status === 'zavrsena') {
-    return {
-      label: 'Završena',
-      toneClass: 'bg-emerald-100 text-emerald-700',
-    }
-  }
-  if (status === 'otkazana') {
-    return {
-      label: 'Otkazana',
-      toneClass: 'bg-rose-100 text-rose-700',
-    }
-  }
-  if (status === 'u_toku') {
-    return {
-      label: 'U toku',
-      toneClass: 'bg-amber-100 text-amber-700',
-    }
-  }
-  return {
-    label: 'U obradi',
-    toneClass: 'bg-slate-100 text-slate-700',
-  }
 }
 
 function Row({
@@ -2232,9 +2265,19 @@ function ConfirmBlock({
   onDisabledActivate?: () => void
 }) {
   const captureDisabledClick = Boolean(disabled && onDisabledActivate)
+  const waitingForLocations = disabled && !onDisabledActivate
   return (
     <div className="relative w-full">
-      <Button variant="cta" className="w-full" disabled={disabled} onClick={onClick}>
+      <Button
+        variant="cta"
+        className={cn(
+          'w-full',
+          waitingForLocations &&
+            'border border-slate-200 bg-slate-100 font-medium text-slate-400 shadow-none hover:translate-y-0 hover:bg-slate-100 hover:brightness-100 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400'
+        )}
+        disabled={disabled}
+        onClick={onClick}
+      >
         {label}
       </Button>
       {captureDisabledClick ? (

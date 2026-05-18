@@ -1,6 +1,6 @@
 import type { AppNotification, NotificationType } from '../types/notifications'
 
-export type AppRole = 'passenger' | 'driver'
+export type AppRole = 'passenger' | 'driver' | 'dispatcher'
 
 /** Target path for in-app navigation. */
 export function notificationDeepLink(n: AppNotification, role: AppRole): string {
@@ -27,6 +27,16 @@ export function notificationDeepLink(n: AppNotification, role: AppRole): string 
     if (t === 'SCHEDULED_RIDE_REMINDER' || t === 'SCHEDULED_RIDE_CANCELLED') return '/app/scheduled'
     if (t === 'ACCOUNT_LOGIN' || t === 'ACCOUNT_UPDATE') return '/app/profile'
     return '/app/order'
+  }
+
+  if (role === 'dispatcher') {
+    if (r && ['DISPATCH_ANOMALY', 'DISPATCH_COMPLAINT', 'RIDE_CANCELLED_BY_DRIVER'].includes(t)) {
+      return `/dispatch/rides/${r}`
+    }
+    if (t === 'DISPATCH_COMPLAINT') return '/dispatch/problems'
+    if (t === 'DISPATCH_RBAC_DENIED') return '/dispatch/activity'
+    if (t === 'ACCOUNT_LOGIN') return '/dispatch'
+    return '/dispatch'
   }
 
   if (r && (t === 'PASSENGER_CANCELLED' || t === 'RIDE_COMPLETED')) return '/driver/active'

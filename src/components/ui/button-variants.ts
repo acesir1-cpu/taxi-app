@@ -6,9 +6,9 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-brand-yellow text-brand-navy shadow-sm shadow-brand-navy/10 hover:-translate-y-px hover:bg-[#FFCF26] hover:shadow-md hover:brightness-[1.02]',
+          'bg-brand-yellow text-brand-navy shadow-sm shadow-brand-navy/10 hover:-translate-y-px hover:bg-brand-yellow-dark hover:shadow-md hover:brightness-[1.02]',
         cta:
-          'h-14 min-h-[56px] rounded-2xl border border-black/[0.08] bg-brand-yellow px-8 text-base font-extrabold tracking-tight text-brand-navy shadow-cta hover:-translate-y-px hover:bg-brand-yellow hover:shadow-cta-hover hover:brightness-[1.06] active:translate-y-0 disabled:!opacity-100 disabled:border-black/[0.06] disabled:bg-slate-200/95 disabled:text-slate-600 disabled:shadow-none disabled:hover:translate-y-0 disabled:hover:brightness-100',
+          'h-14 min-h-[56px] rounded-2xl border border-brand-navy/10 bg-brand-yellow px-8 text-base font-extrabold tracking-tight text-brand-navy shadow-cta hover:-translate-y-px hover:bg-brand-yellow-dark hover:shadow-cta-hover active:translate-y-0 disabled:!opacity-100 disabled:border-black/[0.06] disabled:bg-slate-200/95 disabled:text-slate-600 disabled:shadow-none disabled:hover:translate-y-0 disabled:hover:brightness-100',
         secondary:
           'border border-slate-200/90 bg-white text-brand-navy shadow-sm hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50/90',
         outline: 'border-2 border-brand-navy text-brand-navy bg-transparent hover:bg-brand-navy/5 hover:brightness-[1.02]',

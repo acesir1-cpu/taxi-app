@@ -5,5 +5,7 @@ export function useMe() {
   return useQuery({
     queryKey: ['me'],
     queryFn: getCurrentUser,
+    staleTime: 60_000,
+    placeholderData: (previous) => previous,
   })
 }

@@ -43,7 +43,7 @@ export function AppShell() {
 
   if (isLoading || !me || me.kind !== 'passenger') {
     return (
-      <div className="app-shell-atmosphere min-h-screen">
+      <div className="app-shell-atmosphere app-shell-atmosphere--passenger min-h-screen">
         <LoadingState />
       </div>
     )
@@ -66,7 +66,7 @@ export function AppShell() {
   const rideMapMobileLayout = isOnActiveRideScreen
 
   return (
-    <div className="app-shell-atmosphere min-h-screen pb-24 lg:pb-6">
+    <div className="app-shell-atmosphere app-shell-atmosphere--passenger min-h-screen pb-24 lg:pb-6">
       <div className="pointer-events-none fixed bottom-2 left-2 z-50">
         <span className="rounded-full border border-brand-navy/15 bg-brand-navy px-2 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm">
           {t.common.appVersionBadge}

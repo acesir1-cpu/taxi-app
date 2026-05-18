@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
@@ -431,6 +431,11 @@ export function RidePage() {
       >
         {t.ride.problem}
       </Button>
+      {['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(ride.status) ? (
+        <Button variant="outline" className="flex-1" size="lg" asChild>
+          <Link to={`/app/documents/ride_confirmation/${ride.id}`}>{t.history.viewRideConfirmation}</Link>
+        </Button>
+      ) : null}
     </div>
   )
 

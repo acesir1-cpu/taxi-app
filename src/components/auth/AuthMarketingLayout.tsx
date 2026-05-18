@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { ArrowLeft, CarTaxiFront, Clock3, Star, Users } from 'lucide-react'
+import { ArrowLeft, CarTaxiFront } from 'lucide-react'
 import { useEffect, useReducer, type ReactNode } from 'react'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useMe } from '../../hooks/useMe'
@@ -8,8 +8,7 @@ import { strings } from '../../i18n/strings'
 import { LoadingState } from '../common/LoadingState'
 import { cn } from '../../lib/utils'
 import { AuthHeroPanel } from './AuthHeroPanel'
-
-const APP_VERSION = 'v3.1'
+import { AuthSplitBridge } from './AuthSplitBridge'
 
 /** Mobile hero; desktop pozadina je na `.form-panel` u CSS-u. */
 const FORM_HERO_MOBILE = '/brand-hero-mobile.png'
@@ -44,12 +43,6 @@ export function AuthMarketingLayout() {
   const path = location.pathname
   const showFooter = path === '/welcome'
   const showBack = path !== '/welcome'
-  const welcomeSocialItems = [
-    { icon: Star, label: wc.socialRating },
-    { icon: Users, label: wc.socialUsers },
-    { icon: Clock3, label: wc.socialWait },
-  ]
-
   useEffect(() => {
     document.body.classList.add('auth-screen')
     return () => {
@@ -79,20 +72,25 @@ export function AuthMarketingLayout() {
 
   const langToggle = (tone: 'onHero' | 'onForm') => (
     <div
+      role="group"
+      aria-label={`${wc.langBs} / ${wc.langEn}`}
       className={cn(
-        'flex shrink-0 items-center gap-1.5 text-[12px]',
-        tone === 'onHero' && 'text-white',
+        'auth-lang-switcher flex shrink-0 items-center gap-2.5 text-[12px]',
+        tone === 'onHero' && 'auth-lang-switcher--hero',
+        tone === 'onForm' && 'auth-lang-switcher--form',
       )}
     >
       <button
         type="button"
+        aria-pressed={lg === 'bs'}
         onClick={() => pickLang('bs')}
         className={cn(
-          'font-semibold transition-colors',
+          'auth-lang-switcher__btn relative pb-1 font-semibold transition-colors',
+          lg === 'bs' && 'auth-lang-switcher__btn--active',
           tone === 'onHero'
             ? lg === 'bs'
               ? 'text-white'
-              : 'text-white/55 hover:text-white/85'
+              : 'text-white/60 hover:text-white/90'
             : lg === 'bs'
               ? 'text-[#111827]'
               : 'text-[#9CA3AF] hover:text-[#6B7280]',
@@ -101,27 +99,23 @@ export function AuthMarketingLayout() {
         {wc.langBs}
       </button>
       <span
-        className={cn('select-none', tone === 'onHero' ? 'text-white/40' : 'text-[#D1D5DB]')}
-        aria-hidden
-      >
-        {tone === 'onHero' ? (
-          '·'
-        ) : (
-          <>
-            <span className="md:hidden">·</span>
-            <span className="hidden md:inline">|</span>
-          </>
+        className={cn(
+          'auth-lang-switcher__sep h-4 w-px shrink-0',
+          tone === 'onHero' ? 'bg-white/70' : 'bg-[#9CA3AF]',
         )}
-      </span>
+        aria-hidden
+      />
       <button
         type="button"
+        aria-pressed={lg === 'en'}
         onClick={() => pickLang('en')}
         className={cn(
-          'font-semibold transition-colors',
+          'auth-lang-switcher__btn relative pb-1 font-semibold transition-colors',
+          lg === 'en' && 'auth-lang-switcher__btn--active',
           tone === 'onHero'
             ? lg === 'en'
               ? 'text-white'
-              : 'text-white/55 hover:text-white/85'
+              : 'text-white/60 hover:text-white/90'
             : lg === 'en'
               ? 'text-[#111827]'
               : 'text-[#9CA3AF] hover:text-[#6B7280]',
@@ -136,15 +130,20 @@ export function AuthMarketingLayout() {
 
   const marketingFooter = (extraClass: string): ReactNode =>
     showFooter ? (
-      <footer className={cn('flex w-full flex-wrap items-center justify-between gap-2', extraClass)}>
-        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] font-medium">
+      <footer
+        className={cn(
+          'auth-marketing-footer flex w-full flex-col items-center gap-4 px-4 py-6 text-center text-xs md:flex-row md:items-center md:justify-between md:text-left',
+          extraClass,
+        )}
+      >
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
           <Link
             to="/privacy"
             className="underline-offset-[3px] transition-colors hover:text-[#111827] hover:underline"
           >
             {wc.privacyShort}
           </Link>
-          <span className="select-none" aria-hidden>
+          <span className="hidden select-none md:inline" aria-hidden>
             ·
           </span>
           <Link
@@ -153,7 +152,7 @@ export function AuthMarketingLayout() {
           >
             {wc.termsShort}
           </Link>
-          <span className="select-none" aria-hidden>
+          <span className="hidden select-none md:inline" aria-hidden>
             ·
           </span>
           <Link
@@ -163,18 +162,22 @@ export function AuthMarketingLayout() {
             {wc.support}
           </Link>
         </div>
-        <span className="text-[11px] font-medium">{APP_VERSION}</span>
+        <span className="max-w-sm font-medium leading-relaxed text-[#9ca3af] md:max-w-none">
+          {wc.footerVersion}
+        </span>
       </footer>
     ) : null
 
   return (
     <div
       className={cn(
-        'auth-marketing-root grid min-h-screen min-h-[100svh] min-h-[100dvh] w-full',
-        'grid-cols-1 md:grid-cols-[40fr_60fr] lg:grid-cols-[45fr_55fr]',
+        'auth-marketing-root relative isolate grid min-h-screen min-h-[100svh] min-h-[100dvh] w-full overflow-hidden',
+        'grid-cols-1 gap-0 md:grid-cols-[45fr_55fr]',
       )}
     >
+      <div className="auth-marketing-backdrop" aria-hidden />
       <AuthHeroPanel className="order-2 hidden md:order-1 md:flex" />
+      <AuthSplitBridge />
 
       <div
         className={cn(
@@ -210,24 +213,16 @@ export function AuthMarketingLayout() {
                 )}
                 {showBack ? <MobileHeroBrand compact /> : null}
               </div>
-              {langToggle('onHero')}
+              {langToggle('onForm')}
             </div>
 
             {welcomeOnMobile ? (
               <div className="mobile-hero-content">
-                <span className="powered-by-badge inline-flex items-center rounded-md px-2.5 py-1 text-[10px] uppercase tracking-wide">
+                <span className="powered-by-badge inline-flex items-center rounded-md px-2.5 py-1 text-[10px] uppercase tracking-wide shadow-sm">
                   {wc.aiBadge}
                 </span>
                 <h1 className="mobile-hero-title">{wc.title}</h1>
                 <p className="mobile-hero-subtitle">{wc.subtitle}</p>
-                <div className="welcome-social-proof mobile-welcome-social-proof" aria-label={wc.socialProof}>
-                  {welcomeSocialItems.map(({ icon: Icon, label }) => (
-                    <span key={label} className="welcome-social-proof-item">
-                      <Icon className="h-[13px] w-[13px] shrink-0" strokeWidth={2.2} aria-hidden />
-                      {label}
-                    </span>
-                  ))}
-                </div>
               </div>
             ) : (
               <div className="min-h-0 flex-1" aria-hidden />
@@ -240,6 +235,7 @@ export function AuthMarketingLayout() {
               showFooter && 'auth-marketing-form-panel--welcome',
             )}
           >
+            <div className="auth-marketing-map-depth" aria-hidden />
             {showBack ? (
               <Link
                 to="/welcome"
@@ -258,7 +254,7 @@ export function AuthMarketingLayout() {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                 className={cn(
-                  'form-container mobile-form-card auth-marketing-form-surface mx-auto w-full max-w-[420px] min-h-0 text-left md:mx-auto',
+                  'form-container mobile-form-card auth-marketing-form-surface auth-marketing-form-float mx-auto w-full max-w-[420px] min-h-0 text-left md:mx-auto',
                   path === '/welcome' && 'landing-form-card max-md:max-w-none',
                   path === '/register' && 'mobile-form-card--register',
                 )}
@@ -287,7 +283,7 @@ export function AuthMarketingLayout() {
 
             {showFooter
               ? marketingFooter(
-                  'auth-marketing-footer auth-marketing-footer--desktop-dock mt-auto hidden w-full justify-center px-6 sm:px-8 md:mt-0 md:flex md:px-6',
+                  'auth-marketing-footer auth-marketing-footer--desktop-dock mt-auto hidden w-full px-6 sm:px-8 md:mt-0 md:flex md:px-6',
                 )
               : null}
           </div>

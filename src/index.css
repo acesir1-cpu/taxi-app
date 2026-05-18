@@ -33,9 +33,190 @@
 /* Auth split: hero depth + readable type */
 .auth-hero-panel {
   position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: none;
   background: linear-gradient(160deg, #f5a623 0%, #d4820a 55%, #b86a08 100%);
-  box-shadow: 8px 0 40px rgba(0, 0, 0, 0.15);
+  box-shadow: none;
+  z-index: 2;
+}
+
+.auth-hero-panel::after {
+  content: '';
+  position: absolute;
+  top: -2%;
+  right: 0;
+  z-index: 6;
+  width: 48px;
+  height: 104%;
+  pointer-events: none;
+  border: none;
+  background: linear-gradient(
+    90deg,
+    rgba(184, 106, 8, 0) 0%,
+    rgba(255, 200, 110, 0.22) 55%,
+    rgba(214, 130, 10, 0.1) 100%
+  );
+  clip-path: ellipse(68% 52% at 100% 50%);
+}
+
+.auth-hero-edge-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 100% 75% at 100% 50%,
+    rgba(255, 200, 110, 0.2) 0%,
+    transparent 52%
+  );
+}
+
+.auth-marketing-backdrop {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .auth-marketing-root {
+    position: relative;
+  }
+
+  /* Full-bleed map behind both columns — no seam gap at the split */
+  .auth-marketing-backdrop {
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image: url('/sarajevo-bg.png');
+    background-size: cover;
+    background-position: center 38%;
+    background-repeat: no-repeat;
+  }
+
+  .auth-marketing-right {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+  }
+
+  .auth-hero-panel {
+    z-index: 10;
+    margin-right: -16px;
+    border: none;
+    border-radius: 0 4.5rem 4.5rem 0;
+    filter: drop-shadow(6px 0 20px rgba(217, 119, 6, 0.06));
+  }
+
+  .auth-hero-panel::after {
+    filter: none;
+    width: 64px;
+    clip-path: ellipse(72% 54% at 100% 50%);
+  }
+}
+
+@media (min-width: 1024px) {
+  .auth-hero-panel {
+    border-radius: 0 5.5rem 5.5rem 0;
+    margin-right: -20px;
+  }
+
+  .auth-hero-panel::after {
+    width: 72px;
+    clip-path: ellipse(76% 56% at 100% 50%);
+  }
+}
+
+.auth-hero-depth {
+  position: absolute;
+  inset: 0;
   z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.auth-hero-depth__glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+}
+
+.auth-hero-depth__glow--top {
+  top: -12%;
+  left: -8%;
+  width: 52%;
+  height: 42%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.auth-hero-depth__glow--preview {
+  right: -10%;
+  bottom: 8%;
+  width: 46%;
+  height: 38%;
+  background: rgba(255, 220, 140, 0.2);
+}
+
+.auth-hero-map-decor {
+  z-index: 3;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, #000 58%, transparent 92%);
+  mask-image: linear-gradient(90deg, #000 0%, #000 58%, transparent 92%);
+}
+
+.auth-hero-map-decor__svg {
+  position: absolute;
+  right: 0;
+  bottom: 4%;
+  width: min(54%, 420px);
+  height: auto;
+  opacity: 0.88;
+}
+
+.auth-hero-map-decor__route {
+  stroke: rgba(255, 255, 255, 0.28);
+}
+
+.auth-hero-map-decor__route--b {
+  stroke: rgba(255, 255, 255, 0.16);
+}
+
+.auth-split-bridge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 45%;
+  z-index: 8;
+  width: 120px;
+  transform: translateX(-62%);
+  pointer-events: none;
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .auth-split-bridge {
+    display: block;
+    z-index: 9;
+  }
+}
+
+.auth-split-bridge__glow {
+  position: absolute;
+  inset: 6% 0;
+  background: radial-gradient(
+    ellipse 58% 72% at 42% 50%,
+    rgba(245, 166, 35, 0.38) 0%,
+    rgba(245, 166, 35, 0.14) 45%,
+    transparent 72%
+  );
+  filter: blur(18px);
+}
+
+.auth-split-bridge__svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.9;
 }
 
 .auth-hero-panel::before {
@@ -80,6 +261,27 @@
   border-color: #f5a623 !important;
   background: #fff !important;
   box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.15) !important;
+}
+
+.auth-marketing-form-surface
+  input.auth-input--invalid:not([type='checkbox']):not([type='radio']):not(.phone-field-input),
+.auth-marketing-form-surface
+  input.auth-input--invalid:not([type='checkbox']):not([type='radio']):not(.phone-field-input):focus {
+  border-color: #dc2626 !important;
+  background: #fef2f2 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+}
+
+.auth-marketing-form-surface .phone-input-wrapper.phone-input--invalid {
+  border-color: #dc2626 !important;
+  background: #fef2f2 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12) !important;
+}
+
+.auth-marketing-form-surface .phone-input-wrapper.phone-input--invalid:focus-within {
+  border-color: #dc2626 !important;
+  background: #fef2f2 !important;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15) !important;
 }
 
 .auth-marketing-form-surface div[role='tablist'] {
@@ -189,7 +391,6 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   border-top: none !important;
-  padding: 0 !important;
   margin-top: 1.5rem !important;
 }
 
@@ -323,8 +524,7 @@
     color: #1f2937 !important;
   }
 
-  .auth-marketing-right .mobile-hero-top button[aria-pressed='true'],
-  .auth-marketing-right .mobile-hero-top button.font-bold {
+  .auth-marketing-right .mobile-hero-top .auth-lang-switcher__btn--active {
     color: #111827 !important;
   }
 
@@ -387,6 +587,11 @@
   .landing-form-card {
     min-height: unset !important;
     height: auto !important;
+  }
+
+  .auth-marketing-form-column > .mobile-form-card:not(.landing-form-card) {
+    flex: 1 1 auto !important;
+    min-height: 100% !important;
   }
 
   .mobile-form-card--register {
@@ -496,10 +701,12 @@
 
   .auth-marketing-right .auth-marketing-footer,
   .auth-marketing-right footer.auth-marketing-footer {
-    font-size: 12px !important;
-    color: #9ca3af !important;
     margin-top: 16px !important;
-    text-align: left !important;
+    text-align: center !important;
+  }
+
+  .auth-marketing-right .auth-marketing-footer .flex.flex-wrap {
+    justify-content: center !important;
   }
 
   .powered-badge {
@@ -653,7 +860,13 @@
     min-height: 100vh;
     padding: 48px 80px;
     overflow: hidden;
-    background-image: url('/sarajevo-bg.png');
+    background-color: transparent;
+    background-image: linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(248, 250, 252, 0.28) 42%,
+      rgba(255, 251, 235, 0.18) 100%
+    );
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -663,11 +876,39 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(255, 255, 255, 0.52);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
+    background:
+      radial-gradient(ellipse 85% 65% at 58% 32%, rgba(255, 255, 255, 0.12), transparent 62%),
+      rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
     z-index: 0;
     pointer-events: none;
+  }
+
+  .auth-marketing-right .form-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 88% 12%, rgba(245, 166, 35, 0.1), transparent 40%),
+      linear-gradient(to bottom, transparent 78%, rgba(15, 23, 42, 0.03) 100%);
+  }
+
+  .auth-marketing-map-depth {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse 40% 35% at 78% 22%, rgba(255, 255, 255, 0.08), transparent 65%);
+  }
+
+  .auth-marketing-form-float {
+    position: relative;
+    z-index: 2;
+    filter: drop-shadow(0 8px 24px rgba(15, 23, 42, 0.06));
   }
 
   .auth-marketing-right .form-panel > * {
@@ -758,7 +999,10 @@
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     border-top: none !important;
-    justify-content: center !important;
+    justify-content: space-between !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    text-align: left !important;
   }
 
   .auth-marketing-right .form-panel .auth-footer a,
@@ -782,28 +1026,31 @@
     border-radius: 20px;
     margin-bottom: 10px;
     text-transform: none;
+    box-shadow: 0 2px 12px rgba(245, 166, 35, 0.18);
   }
 
   .auth-marketing-form-panel--welcome .form-container h1 {
     font-size: 36px;
     font-weight: 800;
     color: #111827;
-    line-height: 1.15;
-    margin-bottom: 10px;
+    line-height: 1.2;
+    margin-bottom: 12px;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
   }
 
   .auth-marketing-form-panel--welcome .form-container p {
     font-size: 16px;
     color: #4b5563;
     margin-bottom: 0;
-    line-height: 1.5;
+    line-height: 1.55;
   }
 
   .auth-marketing-form-panel--welcome .welcome-social-proof {
     margin-top: 22px;
   }
 
-  .auth-marketing-form-panel--welcome .btn-primary {
+  .auth-marketing-form-panel--welcome .btn-primary,
+  .auth-marketing-form-panel--welcome .welcome-cta-primary {
     width: 100%;
     height: 54px;
     min-height: 54px;
@@ -814,17 +1061,32 @@
     border-radius: 14px;
     border: none;
     cursor: pointer;
-    box-shadow: none;
+    box-shadow: 0 8px 22px rgba(245, 166, 35, 0.28);
     margin-bottom: 12px;
-    transition: background 0.2s;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.25s ease,
+      background-color 0.2s ease;
   }
 
-  .auth-marketing-form-panel--welcome .btn-primary:hover:not(:disabled) {
-    background: #e8950f;
+  .auth-marketing-form-panel--welcome .btn-primary:hover:not(:disabled),
+  .auth-marketing-form-panel--welcome .welcome-cta-primary:hover:not(:disabled) {
+    background: #ffb840;
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 14px 32px rgba(245, 166, 35, 0.38);
   }
 
-  .auth-marketing-form-panel--welcome .btn-primary:disabled {
+  .auth-marketing-form-panel--welcome .btn-primary:active:not(:disabled),
+  .auth-marketing-form-panel--welcome .welcome-cta-primary:active:not(:disabled) {
+    transform: translateY(0) scale(0.98);
+    box-shadow: 0 6px 16px rgba(245, 166, 35, 0.25);
+  }
+
+  .auth-marketing-form-panel--welcome .btn-primary:disabled,
+  .auth-marketing-form-panel--welcome .welcome-cta-primary:disabled {
     cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
   }
 
   .auth-marketing-form-panel--welcome .secondary-buttons {
@@ -868,6 +1130,34 @@
   top: 24px;
   right: 32px;
   z-index: 20;
+}
+
+.auth-lang-switcher__btn::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: transparent;
+  transition: background-color 0.2s ease;
+}
+
+.auth-lang-switcher__btn--active::after {
+  background: #f5a623;
+}
+
+.auth-lang-switcher--hero .auth-lang-switcher__btn--active::after {
+  background: #ffe08a;
+}
+
+.auth-lang-switcher--hero .auth-lang-switcher__sep {
+  background: rgba(255, 255, 255, 0.75) !important;
+}
+
+.auth-lang-switcher--form .auth-lang-switcher__sep {
+  background: #9ca3af !important;
 }
 
 .content-page-wrapper {
@@ -999,17 +1289,15 @@
 }
 
 .auth-hero-feature-card {
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.12);
-  padding: 12px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 18px rgba(0, 0, 0, 0.06);
 }
 
-.auth-hero-feature-icon {
-  background: rgba(255, 255, 255, 0.16);
+.auth-hero-feature-card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 12px 28px rgba(0, 0, 0, 0.12);
 }
 
 /* Leaflet z-index below modals */
@@ -1085,22 +1373,13 @@
 }
 
 /*
- * Logged-in shell: ista brand ilustracija kao welcome/auth (desktop / mobile),
- * fiksni sloj iza sadržaja. Jači bijeli wash od welcome ekrana da mape i kartice
- * ostanu u prvom planu.
+ * Logged-in shell (vozač / dispečer): brand ilustracija.
+ * Pozadina je na samom kontejneru (ne fixed pseudo) da prati punu visinu stranice
+ * pri skrolanju — fixed + z-index:-1 ostavljao je ravnu #F6F7F9 ispod prvog viewporta.
  */
 .app-shell-atmosphere {
   position: relative;
   background-color: var(--app-shell-base);
-  isolation: isolate;
-}
-
-.app-shell-atmosphere::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  /* Logged-in shell: jači wash od welcome-a da kartice i mape budu u fokusu */
   background-image:
     linear-gradient(
       180deg,
@@ -1112,11 +1391,10 @@
   background-repeat: no-repeat, no-repeat;
   background-size: cover, cover;
   background-position: center, center;
-  pointer-events: none;
 }
 
 @media (max-width: 1023px) {
-  .app-shell-atmosphere::before {
+  .app-shell-atmosphere {
     background-image:
       linear-gradient(
         180deg,
@@ -1127,7 +1405,38 @@
       url('/brand-hero-mobile.png');
     background-repeat: no-repeat, no-repeat;
     background-size: cover, cover;
-    background-position: center top;
+    background-position: center top, center top;
+  }
+}
+
+/* Putnik: ista mapa + frost kao desna kolona na /welcome (auth-marketing-backdrop + form-panel) */
+.app-shell-atmosphere--passenger {
+  background-image:
+    linear-gradient(
+      165deg,
+      rgba(255, 255, 255, 0.42) 0%,
+      rgba(248, 250, 252, 0.28) 42%,
+      rgba(255, 251, 235, 0.18) 100%
+    ),
+    radial-gradient(ellipse 85% 65% at 58% 32%, rgba(255, 255, 255, 0.12), transparent 62%),
+    url('/sarajevo-bg.png');
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  background-size: cover, cover, cover;
+  background-position: center, center, center 38%;
+}
+
+@media (max-width: 1023px) {
+  .app-shell-atmosphere--passenger {
+    background-image:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.55) 0%,
+        rgba(248, 250, 252, 0.4) 48%,
+        rgba(255, 251, 235, 0.32) 100%
+      ),
+      radial-gradient(ellipse 90% 70% at 50% 18%, rgba(255, 255, 255, 0.2), transparent 55%),
+      url('/sarajevo-bg.png');
+    background-position: center, center, center 22%;
   }
 }
 
@@ -1164,21 +1473,20 @@
   }
 
   .app-top-bar,
-  .driver-top-bar {
+  .driver-top-bar,
+  .dispatch-top-bar {
     display: none;
   }
 
   .app-shell-atmosphere {
     padding-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 1rem);
+    background-size: cover, cover;
+    background-position: center top, center top;
   }
 
-  .app-shell-atmosphere::before {
-    /* Fill viewport on tall narrow screens (width% + auto height left gaps). */
-    background-size: cover, cover;
-    background-position: center, center;
-    min-height: 100vh;
-    min-height: 100dvh;
-    min-height: -webkit-fill-available;
+  .app-shell-atmosphere--passenger {
+    background-size: cover, cover, cover;
+    background-position: center, center, center 22%;
   }
 
   .app-shell-atmosphere main {
@@ -1187,7 +1495,8 @@
   }
 
   .passenger-mobile-nav,
-  .driver-mobile-nav {
+  .driver-mobile-nav,
+  .dispatch-mobile-nav {
     min-height: var(--mobile-nav-height);
     /* Flush to screen edges; bar background comes from Tailwind (solid card white). */
     background: #ffffff;
@@ -1196,7 +1505,9 @@
   .passenger-mobile-nav a,
   .passenger-mobile-nav button,
   .driver-mobile-nav a,
-  .driver-mobile-nav button {
+  .driver-mobile-nav button,
+  .dispatch-mobile-nav a,
+  .dispatch-mobile-nav button {
     min-height: clamp(3rem, 9.5vw, 3.5rem);
     font-size: clamp(0.66rem, 2.5vw, 0.76rem);
     letter-spacing: 0.01em;
@@ -1518,11 +1829,12 @@
   gap: 10px;
   border-radius: 14px;
   border: 1px solid rgba(245, 166, 35, 0.2);
-  background: rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.72);
   padding: 10px 14px;
   color: #475569;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
 .welcome-social-proof-item {
@@ -1660,8 +1972,7 @@
     color: #1f2937 !important;
   }
 
-  .landing-page .mobile-hero-top button[aria-pressed='true'],
-  .landing-page .mobile-hero-top button.font-bold {
+  .landing-page .mobile-hero-top .auth-lang-switcher__btn--active {
     color: #111827 !important;
   }
 
@@ -1787,11 +2098,24 @@
   .landing-page .landing-form-card footer,
   .landing-page .landing-form-card .auth-footer {
     margin-top: auto !important;
-    padding-top: 18px !important;
-    padding-bottom: 2px !important;
-    font-size: 11px !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+    text-align: center !important;
     color: #64748b !important;
-    font-weight: 700 !important;
+  }
+
+  .landing-page .landing-form-card .auth-marketing-footer--in-card > div:first-child {
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  .landing-page .landing-form-card .auth-marketing-footer--in-card > span:last-child {
+    display: block !important;
+    width: 100% !important;
+    max-width: 20rem !important;
+    margin-inline: auto !important;
+    text-align: center !important;
+    line-height: 1.45 !important;
   }
 
   .landing-page .landing-form-card .auth-marketing-footer--in-card a,

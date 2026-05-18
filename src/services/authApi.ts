@@ -117,14 +117,17 @@ export async function login(
   }
   user.lastLoginAt = new Date().toISOString()
   db.currentUserId = user.id
-  logActivity(user.id, user.role === 'vozac' ? 'Prijava vozača' : 'Prijava')
+  logActivity(
+    user.id,
+    user.role === 'vozac' ? 'Prijava vozača' : user.role === 'dispecer' ? 'Prijava dispečera' : 'Prijava'
+  )
   persist()
   await appendNotification({
     accountId: user.id,
     type: 'ACCOUNT_LOGIN',
     title: 'Nova prijava',
     body: 'Prijava uspješna. Dobrodošli nazad u UrbanFlow Taxi.',
-    targetApp: user.role === 'vozac' ? 'driver' : 'passenger',
+    targetApp: user.role === 'vozac' ? 'driver' : user.role === 'dispecer' ? 'dispatcher' : 'passenger',
     showBanner: false,
   })
   return { ok: true, accountId: user.id, role: user.role }
@@ -227,6 +230,11 @@ export async function getCurrentUser(): Promise<AuthSession | null> {
     if (!driverProfile) return null
     return { kind: 'driver', account, driverProfile }
   }
+  if (account.role === 'dispecer') {
+    const dispatcherProfile = db.dispatcherProfiles.find((p) => p.accountId === account.id)
+    if (!dispatcherProfile) return null
+    return { kind: 'dispatcher', account, dispatcherProfile }
+  }
   const profile = db.profiles.find((p) => p.accountId === account.id)
   if (!profile) return null
   return { kind: 'passenger', account, profile }
@@ -269,6 +277,29 @@ export async function updateProfile(
       targetApp: 'driver',
       showBanner: false,
     })
+    return { ok: true }
+  }
+  if (account.role === 'dispecer') {
+    const dp = db.dispatcherProfiles.find((p) => p.accountId === accountId)
+    if (!dp) return { error: 'notfound' }
+    if (patch.firstName) {
+      dp.firstName = patch.firstName.trim()
+      dp.fullName = `${dp.firstName} ${dp.lastName}`.trim()
+    }
+    if (patch.lastName) {
+      dp.lastName = patch.lastName.trim()
+      dp.fullName = `${dp.firstName} ${dp.lastName}`.trim()
+    }
+    if (patch.email) {
+      account.email = patch.email.trim().toLowerCase()
+      dp.email = account.email
+    }
+    if (patch.phone) {
+      account.phone = patch.phone.trim()
+      dp.phone = account.phone
+    }
+    logActivity(accountId, 'Ažuriran profil dispečera', 'profile')
+    persist()
     return { ok: true }
   }
   const profile = db.profiles.find((p) => p.accountId === accountId)

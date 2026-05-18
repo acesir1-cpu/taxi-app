@@ -10,6 +10,7 @@ import { getComplaintsForPassenger } from '../services/problemApi'
 import { deleteRideFromHistory, getRatingForRide, getRideHistory, purgePassengerHistory, repeatRide } from '../services/rideApi'
 import { clearHistoryInApp, getHistoryPrivacyPrefs } from '../lib/historyPrivacy'
 import { RideStatusBadge } from '../components/common/StatusBadge'
+import { PassengerInvoiceLink } from '../components/passenger/PassengerInvoiceLink'
 import { EmptyState } from '../components/common/EmptyState'
 import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -603,6 +604,15 @@ function RideHistoryCard({
           >
             {t.history.repeat}
           </button>
+          {ride.status === 'zavrsena' ? (
+            <PassengerInvoiceLink
+              rideId={ride.id}
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+              label={t.history.viewInvoice}
+            />
+          ) : null}
           <div className="ml-auto flex items-center gap-2">
             <button
               type="button"

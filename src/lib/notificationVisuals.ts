@@ -15,7 +15,11 @@ export function notificationIconForType(type: NotificationType): NotificationIco
     case 'RIDE_OFFER_EXPIRED':
     case 'PASSENGER_CANCELLED':
     case 'LOW_RATING_ALERT':
+    case 'DISPATCH_ANOMALY':
+    case 'DISPATCH_RBAC_DENIED':
       return 'alert'
+    case 'DISPATCH_COMPLAINT':
+      return 'person'
     case 'ACCOUNT_LOGIN':
     case 'ACCOUNT_UPDATE':
     case 'PROMO_CODE':

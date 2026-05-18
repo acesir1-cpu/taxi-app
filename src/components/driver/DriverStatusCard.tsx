@@ -5,23 +5,7 @@ import { useDriverShiftMutations } from '../../hooks/useDriverShiftMutations'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle, passengerAppCardClassName } from '../ui/card'
 import { cn } from '../../lib/utils'
-
-function statusColor(s: DriverUiState['availabilityStatus']): string {
-  switch (s) {
-    case 'dostupan':
-      return 'bg-emerald-500'
-    case 'zauzet':
-      return 'bg-amber-400'
-    case 'na_pauzi':
-      return 'bg-amber-400'
-    case 'van_smjene':
-      return 'bg-slate-400'
-    case 'van_funkcije':
-      return 'bg-red-500'
-    default:
-      return 'bg-slate-400'
-  }
-}
+import { driverAvailabilityDotClass, driverBrand } from './driverUi'
 
 export function DriverStatusCard({ accountId, ui }: { accountId: string; ui: DriverUiState }) {
   const { startMut, pauseMut, resumeMut, endMut } = useDriverShiftMutations(accountId)
@@ -40,7 +24,7 @@ export function DriverStatusCard({ accountId, ui }: { accountId: string; ui: Dri
             <span
               className={cn(
                 'inline-flex h-4 w-4 shrink-0 rounded-full ring-2 ring-white shadow-sm',
-                statusColor(ui.availabilityStatus),
+                driverAvailabilityDotClass(ui.availabilityStatus),
                 online && 'animate-pulse'
               )}
               title={driverAvailabilityLabel(ui.availabilityStatus)}
@@ -56,8 +40,8 @@ export function DriverStatusCard({ accountId, ui }: { accountId: string; ui: Dri
         </div>
 
         {vanF ? (
-          <div className="flex gap-2 rounded-2xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div className={cn('flex gap-2 rounded-2xl border px-3 py-2 text-sm', driverBrand.alertDanger)}>
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-brand-danger" />
             <p>Van funkcije — potrebna intervencija dispečera ili administratora prije nastavka rada.</p>
           </div>
         ) : null}
@@ -72,12 +56,7 @@ export function DriverStatusCard({ accountId, ui }: { accountId: string; ui: Dri
 
           {ui.availabilityStatus === 'dostupan' ? (
             <>
-              <Button
-                variant="secondary"
-                className="min-h-11 flex-1 border-amber-400/85 bg-amber-100 text-amber-950 shadow-sm hover:border-amber-500 hover:bg-amber-200/90 hover:text-amber-950 sm:flex-none"
-                onClick={() => pauseMut.mutate()}
-                disabled={pauseMut.isPending}
-              >
+              <Button className="min-h-11 flex-1 sm:flex-none" onClick={() => pauseMut.mutate()} disabled={pauseMut.isPending}>
                 <Coffee className="mr-2 h-4 w-4" />
                 Pauza
               </Button>

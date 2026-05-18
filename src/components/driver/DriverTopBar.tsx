@@ -156,7 +156,7 @@ export function DriverTopBar({
               >
                 <Bell className="h-5 w-5" />
                 {unread > 0 ? (
-                  <span className="absolute -right-0.5 top-0 flex h-4 min-w-[18px] items-center justify-center rounded-full bg-emerald-500 px-0.5 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
+                  <span className="absolute -right-0.5 top-0 flex h-4 min-w-[18px] items-center justify-center rounded-full bg-brand-teal px-0.5 text-[10px] font-bold leading-none text-white shadow-sm ring-2 ring-white">
                     {unread > 9 ? '9+' : unread}
                   </span>
                 ) : null}
@@ -273,7 +273,7 @@ export function DriverTopBar({
                   <button
                     role="menuitem"
                     type="button"
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50 hover:text-red-700"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-brand-danger transition-colors hover:bg-brand-danger/10 hover:text-brand-danger"
                     onClick={() => {
                       setProfileMenuOpen(false)
                       void onLogout()

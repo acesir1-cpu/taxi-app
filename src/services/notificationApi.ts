@@ -34,6 +34,9 @@ const ALL_TYPES: NotificationType[] = [
   'SHIFT_ENDED',
   'EARNINGS_SUMMARY',
   'LOW_RATING_ALERT',
+  'DISPATCH_ANOMALY',
+  'DISPATCH_COMPLAINT',
+  'DISPATCH_RBAC_DENIED',
   'ACCOUNT_LOGIN',
   'ACCOUNT_UPDATE',
   'PROMO_CODE',
@@ -158,6 +161,7 @@ export interface AppendNotificationInput {
 }
 
 function bannerRole(targetApp: NotificationTargetApp): AppRole {
+  if (targetApp === 'dispatcher') return 'dispatcher'
   return targetApp === 'driver' ? 'driver' : 'passenger'
 }
 

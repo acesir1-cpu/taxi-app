@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { DriverActiveRide } from '../types/domain'
-import { driverCompleteRide, driverPatchActiveRidePosition } from '../services/driverSessionApi'
+import {
+  driverCompleteRide,
+  driverMarkArrived,
+  driverPatchActiveRidePosition,
+} from '../services/driverSessionApi'
 import { buildDriverAnimationPath } from '../utils/driverRouteAnimation'
 import { fetchRoadRoute } from '../services/routingApi'
 import { distanceAlongPolylineKm, haversineKm } from '../utils/distance'
@@ -28,6 +32,7 @@ export function useDriverRideMapSimulation(
   const [displayPos, setDisplayPos] = useState<{ lat: number; lng: number } | null>(null)
   const [driverOrigin, setDriverOrigin] = useState<{ lat: number; lng: number } | null>(null)
   const rideIdRef = useRef<string | null>(null)
+  const approachRunIdRef = useRef(0)
   const speedRef = useRef(simSpeed)
   const animCancelRef = useRef<(() => void) | null>(null)
   const animationFrameIdRef = useRef<number | null>(null)
@@ -146,14 +151,37 @@ export function useDriverRideMapSimulation(
     }
 
     if (r.flowStatus === 'vozac_na_putu' || r.flowStatus === 'prihvacena') {
+      const runId = ++approachRunIdRef.current
       let cancelled = false
+
+      const finishApproach = () => {
+        void (async () => {
+          if (cancelled || approachRunIdRef.current !== runId) return
+          const still = rideRef.current
+          if (
+            !still ||
+            still.id !== rideId ||
+            (still.flowStatus !== 'vozac_na_putu' && still.flowStatus !== 'prihvacena')
+          ) {
+            return
+          }
+          const p = { lat: still.pickup.lat, lng: still.pickup.lng }
+          commitPos(p)
+          await driverPatchActiveRidePosition(accountIdBound, p.lat, p.lng)
+          const res = await driverMarkArrived(accountIdBound)
+          if (!('error' in res)) {
+            await qc.invalidateQueries({ queryKey: ['driverUi', accountIdBound] })
+          }
+        })()
+      }
+
       void (async () => {
         const start = displayPosRef.current ?? { lat: r.pickup.lat, lng: r.pickup.lng }
         const road = await fetchRoadRoute(start, r.pickup)
         const approachRaw =
           road.routePoints.length > 1 ? road.routePoints : interpolateRoute(start, r.pickup, 64)
         const approach = buildDriverAnimationPath(approachRaw, start, r.pickup, 64)
-        if (cancelled) return
+        if (cancelled || approachRunIdRef.current !== runId) return
         const still = rideRef.current
         if (
           !still ||
@@ -162,15 +190,7 @@ export function useDriverRideMapSimulation(
         ) {
           return
         }
-        animCancelRef.current = animateMarkerAlongRoute(
-          approach,
-          () => {
-            const p = { lat: r.pickup.lat, lng: r.pickup.lng }
-            commitPos(p)
-            void driverPatchActiveRidePosition(accountIdBound, p.lat, p.lng)
-          },
-          undefined,
-        )
+        animCancelRef.current = animateMarkerAlongRoute(approach, finishApproach, undefined)
       })()
       return () => {
         cancelled = true

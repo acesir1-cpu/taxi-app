@@ -10,6 +10,7 @@ import { RideStatusBadge } from '../components/common/StatusBadge'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { LoadingState } from '../components/common/LoadingState'
+import { PassengerInvoiceLink } from '../components/passenger/PassengerInvoiceLink'
 
 export function HistoryDetailPage() {
   const t = strings()
@@ -147,6 +148,13 @@ export function HistoryDetailPage() {
             </p>
           ) : null}
           <div className="flex flex-wrap gap-2 pt-2">
+            {rideDetail.status === 'zavrsena' ? (
+              <PassengerInvoiceLink rideId={rideDetail.id} />
+            ) : (
+              <Button variant="outline" asChild>
+                <Link to={`/app/documents/ride_confirmation/${rideDetail.id}`}>{t.history.viewRideConfirmation}</Link>
+              </Button>
+            )}
             <Button type="button" onClick={onRepeat}>
               {t.history.repeat}
             </Button>

@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { strings } from '../../i18n/strings'
 import { cn } from '../../lib/utils'
+import { AuthHeroDepth } from './AuthHeroDepth'
+import { AuthHeroMapDecor } from './AuthHeroMapDecor'
 
 /**
  * Shared left (desktop) / lower (mobile) brand hero for Welcome, Login, Register.
@@ -26,10 +28,14 @@ export function AuthHeroPanel({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        'hero-panel auth-hero-panel relative flex min-h-[300px] flex-col justify-between overflow-hidden px-6 py-8 md:h-full md:min-h-0 md:px-10 md:py-12 lg:px-12',
+        'hero-panel auth-hero-panel relative z-10 flex min-h-[300px] flex-col justify-between overflow-hidden border-none px-6 py-8 md:h-full md:min-h-0 md:px-10 md:py-12 lg:px-12',
         className,
       )}
     >
+      <AuthHeroDepth />
+      <AuthHeroMapDecor />
+      <div className="auth-hero-edge-glow" aria-hidden />
+
       <div className="auth-hero-rings" aria-hidden>
         <div className="auth-hero-ring-outer" />
         <div className="auth-hero-ring-inner" />
@@ -45,36 +51,28 @@ export function AuthHeroPanel({ className }: { className?: string }) {
         </div>
 
         {/* Hero copy */}
-        <div className="mt-8 max-w-xl md:mt-10 lg:mt-12">
-          <h1 className="text-[2rem] font-black leading-[1.08] tracking-tight text-white sm:text-[2.5rem] lg:text-5xl xl:text-[3rem]">
+        <div className="mt-10 max-w-xl md:mt-12 lg:mt-14">
+          <h1 className="space-y-1 text-[2rem] font-black leading-snug tracking-tight text-white sm:text-[2.5rem] sm:leading-snug lg:text-5xl lg:leading-snug xl:text-[3rem] xl:leading-snug">
             <span className="block">{wc.aiTitlePart1}</span>
             <span className="block">{wc.aiTitlePart2}</span>
             <span className="block">{wc.aiTitlePart3}</span>
           </h1>
-          <p className="mt-4 text-[15px] font-medium leading-relaxed text-white/90 md:text-base">
+          <p className="mt-5 max-w-lg text-[15px] font-medium leading-relaxed text-white/85 md:mt-6 md:text-base">
             <span>{wc.aiHighlight1}</span>
-            <span className="mx-2 text-white/50" aria-hidden>
+            <span className="mx-2 text-white/70" aria-hidden>
               ·
             </span>
             <span>{wc.aiHighlight2}</span>
-            <span className="mx-2 text-white/50" aria-hidden>
-              ·
-            </span>
-            <span>{wc.aiHighlight3}</span>
           </p>
         </div>
 
         {/* Features */}
-        <ul className="auth-hero-feature-grid mt-8 grid grid-cols-1 gap-3 md:mt-10 xl:grid-cols-2">
+        <ul className="auth-hero-feature-grid mt-9 grid grid-cols-1 gap-3.5 md:mt-11 xl:grid-cols-2">
           {features.map(({ icon: Icon, title, body }) => (
             <HeroFeature key={title} Icon={Icon} title={title} body={body} />
           ))}
         </ul>
 
-        {/* Social proof */}
-        <p className="mt-8 text-[16px] font-semibold leading-snug text-white/95 md:mt-10 md:text-[18px]">
-          {wc.socialProof}
-        </p>
       </div>
     </aside>
   )
@@ -82,16 +80,25 @@ export function AuthHeroPanel({ className }: { className?: string }) {
 
 function HeroFeature({ Icon, title, body }: { Icon: LucideIcon; title: string; body: string }) {
   return (
-    <li className="auth-hero-feature-card flex items-start gap-3">
+    <li
+      className={cn(
+        'auth-hero-feature-card flex items-start gap-3',
+        'rounded-2xl border border-white/20 bg-white/10 p-3.5 backdrop-blur-md',
+        'transition-all duration-300 ease-out',
+        'hover:-translate-y-1 hover:bg-white/15 hover:shadow-lg hover:shadow-black/10',
+      )}
+    >
       <div
-        className="auth-hero-feature-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 backdrop-blur-[2px]"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/15 backdrop-blur-md"
         aria-hidden
       >
         <Icon className="h-[17px] w-[17px] text-white" strokeWidth={2.2} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-extrabold leading-snug text-white">{title}</p>
-        <p className="mt-1 text-[11px] font-semibold leading-snug text-white/75">{body}</p>
+        <p className="text-[13px] font-semibold leading-snug text-white">{title}</p>
+        <p className="auth-hero-feature-body mt-1 text-[11px] font-semibold leading-snug text-white/75">
+          {body}
+        </p>
       </div>
     </li>
   )

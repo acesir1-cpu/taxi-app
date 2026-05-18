@@ -2,6 +2,7 @@ import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { useMe } from './hooks/useMe'
 import { AppShell } from './components/layout/AppShell'
 import { DriverAppShell } from './components/driver/DriverAppShell'
+import { DispatcherAppShell } from './components/dispatch/DispatcherAppShell'
 import { LoadingState } from './components/common/LoadingState'
 import { AuthMarketingLayout } from './components/auth/AuthMarketingLayout'
 import { WelcomePage } from './pages/WelcomePage'
@@ -29,6 +30,18 @@ import { DriverHistoryPage } from './pages/DriverHistoryPage'
 import { DriverEarningsPage } from './pages/DriverEarningsPage'
 import { DriverSettingsPage } from './pages/DriverSettingsPage'
 import { AdminDriverPhotosPage } from './pages/AdminDriverPhotosPage'
+import { PassengerDocumentPage } from './pages/PassengerDocumentPage'
+import { DispatcherActivityPage } from './pages/DispatcherActivityPage'
+import { DispatcherDashboardPage } from './pages/DispatcherDashboardPage'
+import { DispatcherDriversPage } from './pages/DispatcherDriversPage'
+import { DispatcherProblemsPage } from './pages/DispatcherProblemsPage'
+import { DispatcherReportViewPage } from './pages/DispatcherReportViewPage'
+import { DispatcherReportsPage } from './pages/DispatcherReportsPage'
+import { DispatcherRideDetailPage } from './pages/DispatcherRideDetailPage'
+import { DispatcherRidesPage } from './pages/DispatcherRidesPage'
+import { DispatcherSettingsPage } from './pages/DispatcherSettingsPage'
+import { DesignConsistencyPage } from './pages/DesignConsistencyPage'
+import { FutureRoleDemoPage } from './pages/FutureRoleDemoPage'
 
 function RootRedirect() {
   const { data, isLoading } = useMe()
@@ -41,6 +54,7 @@ function RootRedirect() {
   }
   if (!data) return <Navigate to="/welcome" replace />
   if (data.kind === 'driver') return <Navigate to="/driver" replace />
+  if (data.kind === 'dispatcher') return <Navigate to="/dispatch" replace />
   return <Navigate to="/app/order" replace />
 }
 
@@ -54,6 +68,7 @@ function GuestLayout() {
     )
   }
   if (data?.kind === 'driver') return <Navigate to="/driver" replace />
+  if (data?.kind === 'dispatcher') return <Navigate to="/dispatch" replace />
   if (data?.kind === 'passenger') return <Navigate to="/app/order" replace />
   return <Outlet />
 }
@@ -69,6 +84,7 @@ function PassengerProtectedLayout() {
   }
   if (!data) return <Navigate to="/welcome" replace />
   if (data.kind === 'driver') return <Navigate to="/driver" replace />
+  if (data.kind === 'dispatcher') return <Navigate to="/dispatch" replace />
   return <Outlet />
 }
 
@@ -83,7 +99,25 @@ function DriverProtectedLayout() {
   }
   if (!data) return <Navigate to="/welcome" replace />
   if (data.kind === 'passenger') return <Navigate to="/app/order" replace />
+  if (data.kind === 'dispatcher') return <Navigate to="/dispatch" replace />
   return <Outlet />
+}
+
+function DispatcherProtectedLayout() {
+  const { data, isPending } = useMe()
+  if (isPending && !data) {
+    return (
+      <div className="app-shell-atmosphere flex min-h-screen items-center justify-center">
+        <LoadingState />
+      </div>
+    )
+  }
+  if (!data) return <Navigate to="/welcome" replace />
+  if (data.kind !== 'dispatcher') {
+    if (data.kind === 'driver') return <Navigate to="/driver" replace />
+    return <Navigate to="/app/order" replace />
+  }
+  return <Outlet context={{ me: data }} />
 }
 
 export default function App() {
@@ -91,6 +125,10 @@ export default function App() {
     <Routes>
       <Route path="/" element={<RootRedirect />} />
       <Route path="/admin/vozaci-fotografije" element={<AdminDriverPhotosPage />} />
+      <Route path="/dokaz-konzistentnosti" element={<DesignConsistencyPage />} />
+      <Route path="/demo/menadzer" element={<FutureRoleDemoPage role="manager" />} />
+      <Route path="/demo/poslovni-administrator" element={<FutureRoleDemoPage role="business-admin" />} />
+      <Route path="/demo/it-administrator" element={<FutureRoleDemoPage role="it-admin" />} />
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/support" element={<SupportPage />} />
@@ -114,6 +152,7 @@ export default function App() {
           <Route path="history" element={<HistoryPage />} />
           <Route path="scheduled" element={<ScheduledRidesPage />} />
           <Route path="history/:id" element={<HistoryDetailPage />} />
+          <Route path="documents/:docType/:entityId" element={<PassengerDocumentPage />} />
           <Route path="problem/:rideId" element={<ProblemPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="privacy" element={<PrivacyPage />} />
@@ -127,6 +166,19 @@ export default function App() {
           <Route path="history" element={<DriverHistoryPage />} />
           <Route path="earnings" element={<DriverEarningsPage />} />
           <Route path="settings" element={<DriverSettingsPage />} />
+        </Route>
+      </Route>
+      <Route element={<DispatcherProtectedLayout />}>
+        <Route path="/dispatch" element={<DispatcherAppShell />}>
+          <Route index element={<DispatcherDashboardPage />} />
+          <Route path="rides" element={<DispatcherRidesPage />} />
+          <Route path="rides/:id" element={<DispatcherRideDetailPage />} />
+          <Route path="drivers" element={<DispatcherDriversPage />} />
+          <Route path="problems" element={<DispatcherProblemsPage />} />
+          <Route path="reports" element={<DispatcherReportsPage />} />
+          <Route path="reports/:reportType" element={<DispatcherReportViewPage />} />
+          <Route path="activity" element={<DispatcherActivityPage />} />
+          <Route path="settings" element={<DispatcherSettingsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/welcome" replace />} />

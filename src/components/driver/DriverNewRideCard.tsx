@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { RejectRideModal } from './RejectRideModal'
 import { cn } from '../../lib/utils'
 import { loadRidePrefs } from '../../lib/driverSettingsPrefs'
+import { driverBrand, driverDestructiveButtonClass } from './driverUi'
 
 export function DriverNewRideCard({ accountId, ui }: { accountId: string; ui: DriverUiState }) {
   const qc = useQueryClient()
@@ -83,7 +84,7 @@ export function DriverNewRideCard({ accountId, ui }: { accountId: string; ui: Dr
                   'rounded-full border px-3 py-1.5 text-xs font-semibold',
                   preShift
                     ? 'border-slate-200 bg-slate-200 text-slate-600 hover:bg-slate-200'
-                    : 'border-slate-200/90 bg-brand-yellow text-brand-navy hover:bg-brand-yellow',
+                    : driverBrand.newRideBadge,
                 )}
               >
                 NOVO
@@ -110,14 +111,14 @@ export function DriverNewRideCard({ accountId, ui }: { accountId: string; ui: Dr
             <>
               <div className="space-y-2 rounded-2xl bg-slate-50/90 p-3 text-sm">
                 <div className="flex items-start gap-2">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                  <MapPin className={cn('mt-0.5 h-4 w-4 shrink-0', driverBrand.pickupIcon)} />
                   <div>
                     <p className="text-xs font-semibold tracking-wide text-slate-600">Preuzimanje</p>
                     <p className="font-semibold text-brand-navy">{req.pickup.label}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
-                  <Navigation className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                  <Navigation className={cn('mt-0.5 h-4 w-4 shrink-0', driverBrand.destinationIcon)} />
                   <div>
                     <p className="text-xs font-semibold tracking-wide text-slate-600">Odredište</p>
                     <p className="font-semibold text-brand-navy">{req.destination.label}</p>
@@ -146,7 +147,7 @@ export function DriverNewRideCard({ accountId, ui }: { accountId: string; ui: Dr
                   <span className="font-semibold capitalize">{req.type}</span>
                 </p>
                 {distanceWarn ? (
-                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-900">
+                  <p className="rounded-xl border border-brand-yellow/30 bg-brand-yellow/10 px-2 py-1.5 text-xs font-semibold text-brand-navy">
                     Upozorenje: udaljenost do putnika ({req.distanceToPassengerKm} km) prelazi vašu postavku maksimalne
                     udaljenosti ({ridePrefs.maxDistanceKm} km). I dalje možete prihvatiti vožnju.
                   </p>
@@ -163,7 +164,7 @@ export function DriverNewRideCard({ accountId, ui }: { accountId: string; ui: Dr
                 </Button>
                 <Button
                   variant="outlineThin"
-                  className="min-h-11 flex-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+                  className={driverDestructiveButtonClass('flex-1')}
                   disabled={rejectMut.isPending || !req}
                   onClick={() => setRejectOpen(true)}
                 >

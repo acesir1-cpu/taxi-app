@@ -78,7 +78,7 @@ export function DriverActiveRidePage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-2 rounded-2xl bg-slate-50 p-3 sm:col-span-2">
-                  <MapPin className="mt-0.5 h-4 w-4 text-emerald-600" />
+                  <MapPin className="mt-0.5 h-4 w-4 text-brand-teal" />
                   <div>
                     <p className="text-xs font-bold uppercase text-slate-500">{t.driver.rideRoute}</p>
                     <p className="font-semibold text-brand-navy">

@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { driverBrand } from '../components/driver/driverUi'
 import { ProblemReportModal } from '../components/driver/ProblemReportModal'
 import { AccountProfileFormFields } from '../components/settings/AccountProfileFormFields'
 import { LogoutSection } from '../components/settings/LogoutSection'
@@ -85,13 +86,13 @@ function accountStatusLabel(status: AccountStatus): string {
 function accountBadgeClass(status: AccountStatus): string {
   switch (status) {
     case 'aktivan':
-      return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+      return driverBrand.successBadge
     case 'suspendovan':
     case 'blokiran':
-      return 'bg-red-100 text-red-800 border-red-200'
+      return driverBrand.dangerBadge
     case 'neaktivan':
     default:
-      return 'bg-slate-100 text-slate-700 border-slate-200'
+      return driverBrand.mutedBadge
   }
 }
 
@@ -108,20 +109,20 @@ function vehicleStatusLabel(s: string): string {
 function vehicleBadgeClass(s: string): string {
   switch (s) {
     case 'dostupno':
-      return 'bg-emerald-100 text-emerald-800'
+      return driverBrand.successBadge
     case 'zauzeto':
-      return 'bg-blue-100 text-blue-900'
+      return driverBrand.warningBadge
     case 'van_funkcije':
-      return 'bg-red-100 text-red-800'
+      return driverBrand.dangerBadge
     default:
-      return 'bg-slate-100 text-slate-700'
+      return driverBrand.mutedBadge
   }
 }
 
 function perfBadge(acceptance: number, unjustified: number): { label: string; className: string } {
-  if (acceptance >= 88 && unjustified <= 1) return { label: 'Dobro', className: 'bg-emerald-100 text-emerald-800' }
-  if (acceptance >= 75 && unjustified <= 3) return { label: 'Upozorenje', className: 'bg-amber-100 text-amber-900' }
-  return { label: 'Potrebna pažnja', className: 'bg-red-100 text-red-800' }
+  if (acceptance >= 88 && unjustified <= 1) return { label: 'Dobro', className: driverBrand.successBadge }
+  if (acceptance >= 75 && unjustified <= 3) return { label: 'Upozorenje', className: driverBrand.warningBadge }
+  return { label: 'Potrebna pažnja', className: driverBrand.dangerBadge }
 }
 
 function liveTotalShiftSeconds(ui: import('../types/domain').DriverUiState, nowMs: number): number {
@@ -566,16 +567,16 @@ export function DriverSettingsPage() {
                 {accountStatusLabel(me.account.status)}
               </Badge>
               {ui.flags.accountSuspended ? (
-                <Badge className="rounded-full bg-red-100 text-red-800">Suspendovan nalog</Badge>
+                <Badge className={cn('rounded-full', driverBrand.dangerBadge)}>Suspendovan nalog</Badge>
               ) : null}
               {ui.flags.licenseExpired ? (
-                <Badge className="rounded-full bg-red-100 text-red-800">Istekla licenca</Badge>
+                <Badge className={cn('rounded-full', driverBrand.dangerBadge)}>Istekla licenca</Badge>
               ) : null}
               {ui.flags.debtOwed ? (
-                <Badge className="rounded-full bg-amber-100 text-amber-900">Dug prema firmi</Badge>
+                <Badge className="rounded-full bg-brand-yellow/15 text-brand-navy">Dug prema firmi</Badge>
               ) : null}
               {ui.flags.gpsUnavailableSim ? (
-                <Badge className="rounded-full bg-amber-100 text-amber-900">GPS greška</Badge>
+                <Badge className="rounded-full bg-brand-yellow/15 text-brand-navy">GPS greška</Badge>
               ) : null}
             </div>
             <p className="text-sm text-slate-600">Ograničenja postavlja administracija sistema.</p>
@@ -592,7 +593,7 @@ export function DriverSettingsPage() {
                 <span
                   className={cn(
                     'font-semibold',
-                    licenseLabel === 'Istekla' ? 'text-red-700' : licenseLabel === 'U provjeri' ? 'text-amber-700' : 'text-emerald-700'
+                    licenseLabel === 'Istekla' ? 'text-brand-danger' : licenseLabel === 'U provjeri' ? 'text-brand-yellow-dark' : 'text-brand-teal'
                   )}
                 >
                   {licenseLabel}
@@ -608,15 +609,15 @@ export function DriverSettingsPage() {
               </p>
               <p>
                 <span className="font-semibold">Verifikacija identiteta:</span>{' '}
-                <span className="text-emerald-700 font-medium">Verifikovan</span>
+                <span className="font-medium text-brand-teal">Verifikovan</span>
               </p>
               <p>
                 <span className="font-semibold">Ljekarsko uvjerenje:</span>{' '}
-                <span className="text-emerald-700 font-medium">Valjano</span>
+                <span className="font-medium text-brand-teal">Valjano</span>
               </p>
               <p>
                 <span className="font-semibold">Status dokumentacije:</span>{' '}
-                <span className="text-emerald-700 font-medium">Kompletna</span>
+                <span className="font-medium text-brand-teal">Kompletna</span>
               </p>
               <p>
                 <span className="font-semibold">Dug prema firmi:</span>{' '}
@@ -624,7 +625,7 @@ export function DriverSettingsPage() {
               </p>
             </div>
             {ui.flags.debtOwed ? (
-              <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+              <p className="rounded-xl border border-brand-yellow/30 bg-brand-yellow/10 px-3 py-2 text-sm font-medium text-brand-navy">
                 Upozorenje: evidentiran je dug prema firmi. Riješite saldo prije početka smjene.
               </p>
             ) : null}
@@ -703,7 +704,7 @@ export function DriverSettingsPage() {
           </SettingsSectionCard>
 
           {/* 5 Smjena */}
-          <SettingsSectionCard icon={Clock3} title="Smjena i dostupnost" color="bg-amber-500 text-brand-navy">
+          <SettingsSectionCard icon={Clock3} title="Smjena i dostupnost" color="bg-brand-yellow text-brand-navy">
             <div className="grid gap-2 text-sm sm:grid-cols-2">
               <p>
                 <span className="font-semibold">Status vozača:</span> {driverAvailabilityLabel(ui.availabilityStatus)}
@@ -741,12 +742,7 @@ export function DriverSettingsPage() {
               ) : null}
               {ui.availabilityStatus === 'dostupan' ? (
                 <>
-                  <Button
-                    variant="secondary"
-                    className="min-h-11 border-amber-400/85 bg-amber-100 text-amber-950 shadow-sm hover:border-amber-500 hover:bg-amber-200/90 hover:text-amber-950"
-                    onClick={() => pauseMut.mutate()}
-                    disabled={pauseMut.isPending}
-                  >
+                  <Button className="min-h-11" onClick={() => pauseMut.mutate()} disabled={pauseMut.isPending}>
                     Pauza
                   </Button>
                   <Button
@@ -795,7 +791,7 @@ export function DriverSettingsPage() {
               onChange={onGpsToggle}
             />
             {ui.flags.gpsUnavailableSim ? (
-              <p className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+              <p className={cn('rounded-xl px-3 py-2 text-sm font-medium', driverBrand.alertDanger)}>
                 GPS lokacija trenutno nije dostupna. Ne možete postati dostupni dok se problem ne otkloni.
               </p>
             ) : null}
@@ -829,7 +825,7 @@ export function DriverSettingsPage() {
           </SettingsSectionCard>
 
           {/* 7 Notifikacije */}
-          <SettingsSectionCard icon={Bell} title="Obavještenja" color="bg-emerald-600 text-white">
+          <SettingsSectionCard icon={Bell} title="Obavještenja" color="bg-brand-teal text-white">
             <ToggleRow
               title="Email obavještenja"
               description="Važne poruke i sažeci na e-mail."
@@ -863,7 +859,7 @@ export function DriverSettingsPage() {
               onChange={(v) => persistNotify({ ...notifyPrefs, newRideRequests: v })}
             />
             {!notifyPrefs.newRideRequests ? (
-              <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+              <p className="rounded-xl bg-brand-yellow/10 px-3 py-2 text-xs font-medium text-brand-navy">
                 Zahtjeve i dalje vidite u aplikaciji; push i e-mail za nove zahtjeve su isključeni.
               </p>
             ) : null}
@@ -972,7 +968,7 @@ export function DriverSettingsPage() {
           </SettingsSectionCard>
 
           {/* Personalizacija */}
-          <SettingsSectionCard icon={Globe2} title="Personalizacija" color="bg-sky-600 text-white">
+          <SettingsSectionCard icon={Globe2} title="Personalizacija" color="bg-brand-navy text-white">
             <p className="text-sm text-slate-700">Jezik aplikacije koristi se za prikaz interfejsa i obavještenja. Podesite ga u odjeljku profila iznad.</p>
           </SettingsSectionCard>
 
@@ -1047,7 +1043,7 @@ export function DriverSettingsPage() {
                 <span className="font-semibold">Prosječno vrijeme dolaska:</span> ~{perf.avgEta} min
               </p>
             </div>
-            <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            <p className={cn('rounded-xl border px-3 py-2 text-sm', driverBrand.successBadge)}>
               Savjet: održavajte visoku stopu prihvatanja i pravovremeno reagujte na poruke dispečera.
             </p>
           </SettingsSectionCard>
@@ -1101,7 +1097,7 @@ export function DriverSettingsPage() {
           </SettingsSectionCard>
 
           {/* 12 Podrška */}
-          <SettingsSectionCard icon={Headphones} title="Podrška" color="bg-red-600 text-white">
+          <SettingsSectionCard icon={Headphones} title="Podrška" color="bg-brand-danger text-white">
             <div className="rounded-2xl border border-black/[0.08] bg-white p-4 text-sm text-slate-700">
               <p className="font-semibold text-brand-navy">Dispečerska podrška</p>
               <p className="mt-2">Telefon, e-mail i hitna linija tokom vožnje dostupni su u modalima ispod.</p>

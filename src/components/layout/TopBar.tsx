@@ -114,7 +114,7 @@ export function TopBar({ accountId, name }: { accountId: string; name: string })
           <AppNavLink to="/app/scheduled" icon={<CalendarClock className="h-4 w-4" />} label={t.nav.scheduled} />
           <AppNavLink to="/app/history" icon={<History className="h-4 w-4" />} label={t.nav.history} />
         </nav>
-        <div className="flex items-center gap-2.5 overflow-visible md:gap-3">
+        <div className="flex items-center gap-4 overflow-visible md:gap-6">
           <div className="flex items-center gap-1.5 overflow-visible rounded-xl border border-slate-200/80 bg-white px-1.5 py-1 shadow-[0_1px_0_rgba(15,23,42,0.03)]">
             <div className="relative overflow-visible" ref={bellTriggerRef}>
               <button
@@ -344,7 +344,7 @@ function AppNavLink({
       }}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-150 ease-out',
+          'flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-[color,background-color,box-shadow,transform] duration-200 ease-out',
           isActive
             ? activeTone === 'yellow'
               ? 'bg-brand-yellow/30 text-brand-navy shadow-[0_1px_0_rgba(15,23,42,0.08)]'

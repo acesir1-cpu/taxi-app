@@ -1,5 +1,7 @@
 import type {
   Complaint,
+  DispatchLog,
+  DispatcherProfile,
   Driver,
   DriverHistoryItem,
   DriverUiState,
@@ -247,6 +249,50 @@ const vehicles: Vehicle[] = [
     type: 'limuzina',
     status: 'dostupno',
   },
+  {
+    id: 'veh-5',
+    registration: 'S22-B-441',
+    brand: 'Toyota',
+    model: 'Yaris',
+    year: 2022,
+    color: 'Siva',
+    seatCount: 4,
+    type: 'limuzina',
+    status: 'dostupno',
+  },
+  {
+    id: 'veh-6',
+    registration: 'H55-C-778',
+    brand: 'Hyundai',
+    model: 'i30',
+    year: 2021,
+    color: 'Crna',
+    seatCount: 4,
+    type: 'limuzina',
+    status: 'dostupno',
+  },
+  {
+    id: 'veh-7',
+    registration: 'F33-D-902',
+    brand: 'Ford',
+    model: 'Focus',
+    year: 2020,
+    color: 'Bijela',
+    seatCount: 4,
+    type: 'limuzina',
+    status: 'dostupno',
+  },
+  {
+    id: 'veh-8',
+    registration: 'P11-E-215',
+    brand: 'Peugeot',
+    model: '308',
+    year: 2019,
+    color: 'Srebrna',
+    seatCount: 4,
+    type: 'limuzina',
+    status: 'dostupno',
+  },
 ]
 
 const drivers: Driver[] = [
@@ -270,7 +316,7 @@ const drivers: Driver[] = [
     avatarUrl: driverAvatarNermin,
     phone: '+38761110002',
     licenseNumber: 'BH-DRV-002',
-    availabilityStatus: 'dostupan',
+    availabilityStatus: 'zauzet',
     rating: 4.8,
     totalRatings: 156,
     currentLocation: { lat: 43.856, lng: 18.404 },
@@ -301,6 +347,58 @@ const drivers: Driver[] = [
     totalRatings: 74,
     currentLocation: { lat: 43.852, lng: 18.395 },
     vehicleId: 'veh-4',
+  },
+  {
+    id: 'drv-senad',
+    firstName: 'Senad',
+    lastName: 'B.',
+    avatarUrl: driverAvatarNermin,
+    phone: '+38761110005',
+    licenseNumber: 'BH-DRV-005',
+    availabilityStatus: 'dostupan',
+    rating: 4.85,
+    totalRatings: 132,
+    currentLocation: { lat: 43.8625, lng: 18.418 },
+    vehicleId: 'veh-5',
+  },
+  {
+    id: 'drv-ajla',
+    firstName: 'Ajla',
+    lastName: 'R.',
+    avatarUrl: driverAvatarEldar,
+    phone: '+38761110006',
+    licenseNumber: 'BH-DRV-006',
+    availabilityStatus: 'dostupan',
+    rating: 4.92,
+    totalRatings: 188,
+    currentLocation: { lat: 43.8548, lng: 18.401 },
+    vehicleId: 'veh-6',
+  },
+  {
+    id: 'drv-haris',
+    firstName: 'Haris',
+    lastName: 'T.',
+    avatarUrl: driverAvatarAmir,
+    phone: '+38761110007',
+    licenseNumber: 'BH-DRV-007',
+    availabilityStatus: 'dostupan',
+    rating: 4.75,
+    totalRatings: 91,
+    currentLocation: { lat: 43.8478, lng: 18.392 },
+    vehicleId: 'veh-7',
+  },
+  {
+    id: 'drv-emina',
+    firstName: 'Emina',
+    lastName: 'K.',
+    avatarUrl: driverAvatarMirza,
+    phone: '+38761110008',
+    licenseNumber: 'BH-DRV-008',
+    availabilityStatus: 'dostupan',
+    rating: 4.88,
+    totalRatings: 145,
+    currentLocation: { lat: 43.8512, lng: 18.425 },
+    vehicleId: 'veh-8',
   },
 ]
 
@@ -521,9 +619,6 @@ const scheduledReq1Pickup = loc('loc-bcc')
 const scheduledReq1Dest = loc('loc-airport')
 const scheduledReq2Pickup = loc('loc-marijin')
 const scheduledReq2Dest = loc('loc-vogosca')
-const scheduledReq3Pickup = loc('loc-ilidza')
-const scheduledReq3Dest = loc('loc-centar')
-
 const demoScheduledRequests = [
   {
     id: 'req-seed-scheduled-1',
@@ -556,18 +651,57 @@ const demoScheduledRequests = [
   {
     id: 'req-seed-scheduled-3',
     passengerId: DEMO_PROFILE_ID,
-    pickup: scheduledReq3Pickup,
-    destination: scheduledReq3Dest,
+    pickup: loc('loc-kosevo'),
+    destination: loc('loc-dobrinja'),
     createdAt: new Date(Date.now() - 900000).toISOString(),
-    orderType: 'zakazano' as const,
-    scheduledAt: new Date(Date.now() + 86400000 * 3 + 2700000).toISOString(),
-    estimatedPrice: 12.2,
-    estimatedDurationMin: 16,
-    estimatedEtaMin: 16,
-    distanceKm: 7.1,
-    status: 'dodijeljen' as const,
+    orderType: 'odmah' as const,
+    estimatedPrice: 9.8,
+    estimatedDurationMin: 14,
+    estimatedEtaMin: 6,
+    distanceKm: 5.4,
+    status: 'u_obradi' as const,
   },
 ]
+
+const dispatchAssignedPickup = loc('loc-ilidza')
+const dispatchAssignedDest = loc('loc-centar')
+const dispatchAssignedRoute = simpleRoute(dispatchAssignedPickup, dispatchAssignedDest)
+
+const dispatchAssignedRequest = {
+  id: 'req-dispatch-assigned-1',
+  passengerId: DEMO_PROFILE_ID,
+  pickup: dispatchAssignedPickup,
+  destination: dispatchAssignedDest,
+  createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+  orderType: 'odmah' as const,
+  estimatedPrice: 11.4,
+  estimatedDurationMin: 16,
+  estimatedEtaMin: 4,
+  distanceKm: 6.2,
+  status: 'dodijeljen' as const,
+  rideId: 'ride-dispatch-assigned-1',
+}
+
+const dispatchAssignedRide: Ride = {
+  id: 'ride-dispatch-assigned-1',
+  requestId: dispatchAssignedRequest.id,
+  passengerId: DEMO_PROFILE_ID,
+  driverId: 'drv-eldar',
+  vehicleId: 'veh-3',
+  status: 'dodijeljena',
+  orderType: 'odmah',
+  pickup: dispatchAssignedPickup,
+  destination: dispatchAssignedDest,
+  routePoints: dispatchAssignedRoute,
+  estimatedPrice: 11.4,
+  distanceKm: 6.2,
+  estimatedDurationMin: 16,
+  paymentMethod: 'gotovina',
+  createdAt: dispatchAssignedRequest.createdAt,
+  assignedAt: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
+  driverLat: 43.8495,
+  driverLng: 18.3885,
+}
 
 const demoPassengerRides = [ridePast1, ridePast2, ridePast3, ridePast4, ridePast5, ridePast6, ridePast7, ridePast8]
 
@@ -602,6 +736,68 @@ const complaints: Complaint[] = [
     createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
   },
 ]
+
+const DISPATCH_PHONE_USER_ID = 'acc-dispatch-phone-1'
+const DISPATCH_PHONE_PROFILE_ID = 'prof-dispatch-phone-1'
+
+const dispatchPhoneUser: UserAccount = {
+  id: DISPATCH_PHONE_USER_ID,
+  role: 'putnik',
+  email: 'poziv.korisnik@urbanflow.ba',
+  phone: '+38761111999',
+  passwordPlain: 'Test12345',
+  status: 'aktivan',
+  createdAt: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
+  verifiedAt: new Date(Date.now() - 1000 * 60 * 74).toISOString(),
+}
+
+const dispatchPhoneProfile: PassengerProfile = {
+  id: DISPATCH_PHONE_PROFILE_ID,
+  accountId: DISPATCH_PHONE_USER_ID,
+  firstName: 'Telefon',
+  lastName: 'Poziv',
+  registeredAt: dispatchPhoneUser.createdAt,
+}
+
+const dispatchActivePickup = loc('loc-bascarsija')
+const dispatchActiveDest = loc('loc-airport')
+const dispatchActiveRoute = simpleRoute(dispatchActivePickup, dispatchActiveDest)
+
+const dispatchActiveRequest = {
+  id: 'req-dispatch-active-1',
+  passengerId: DISPATCH_PHONE_PROFILE_ID,
+  pickup: dispatchActivePickup,
+  destination: dispatchActiveDest,
+  createdAt: new Date(Date.now() - 1000 * 60 * 16).toISOString(),
+  orderType: 'odmah' as const,
+  estimatedPrice: 18.5,
+  estimatedDurationMin: 22,
+  estimatedEtaMin: 5,
+  distanceKm: 12.6,
+  status: 'dodijeljen' as const,
+  rideId: 'ride-dispatch-active-1',
+}
+
+const dispatchActiveRide: Ride = {
+  id: 'ride-dispatch-active-1',
+  requestId: dispatchActiveRequest.id,
+  passengerId: DISPATCH_PHONE_PROFILE_ID,
+  driverId: 'drv-nermin',
+  vehicleId: 'veh-2',
+  status: 'vozac_na_putu',
+  orderType: 'odmah',
+  pickup: dispatchActivePickup,
+  destination: dispatchActiveDest,
+  routePoints: dispatchActiveRoute,
+  estimatedPrice: 18.5,
+  distanceKm: 12.6,
+  estimatedDurationMin: 22,
+  paymentMethod: 'gotovina',
+  createdAt: dispatchActiveRequest.createdAt,
+  assignedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+  driverLat: 43.856,
+  driverLng: 18.404,
+}
 
 export const DEMO_DRIVER_ACCOUNT_ID = 'acc-driver-demo-1'
 export const DEMO_DRIVER_PROFILE_ID = 'driver-demo-1'
@@ -642,6 +838,89 @@ const demoDriverProfile: DriverUserProfile = {
 
 export const DEMO_DRIVER_EMAIL = demoDriverUser.email
 export const DEMO_DRIVER_PASSWORD = demoDriverUser.passwordPlain
+
+export const DEMO_DISPATCHER_ACCOUNT_ID = 'acc-dispatcher-demo-1'
+export const DEMO_DISPATCHER_PROFILE_ID = 'dispatcher-demo-1'
+
+const demoDispatcherUser: UserAccount = {
+  id: DEMO_DISPATCHER_ACCOUNT_ID,
+  role: 'dispecer',
+  email: 'dispecer@urbanflow.ba',
+  phone: '+38761111444',
+  passwordPlain: 'Test12345',
+  status: 'aktivan',
+  createdAt: new Date(Date.now() - 86400000 * 40).toISOString(),
+  lastLoginAt: new Date().toISOString(),
+  verifiedAt: new Date(Date.now() - 86400000 * 39).toISOString(),
+}
+
+const demoDispatcherProfile: DispatcherProfile = {
+  id: DEMO_DISPATCHER_PROFILE_ID,
+  accountId: DEMO_DISPATCHER_ACCOUNT_ID,
+  firstName: 'Amina',
+  lastName: 'D.',
+  fullName: 'Amina D.',
+  email: demoDispatcherUser.email,
+  phone: demoDispatcherUser.phone,
+  roleLevel: 'sef_smjene',
+  shiftName: 'Dnevna smjena',
+  registeredAt: demoDispatcherUser.createdAt,
+}
+
+export const DEMO_DISPATCHER_EMAIL = demoDispatcherUser.email
+export const DEMO_DISPATCHER_PASSWORD = demoDispatcherUser.passwordPlain
+
+function createDefaultDispatchLogs(): DispatchLog[] {
+  const now = Date.now()
+  return [
+    {
+      id: 'dispatch-log-seed-1',
+      createdAt: new Date(now - 1000 * 60 * 18).toISOString(),
+      dispatcherAccountId: DEMO_DISPATCHER_ACCOUNT_ID,
+      kind: 'system',
+      message: 'Dispečerski panel spreman. Praćenje aktivnih vozila uključeno.',
+    },
+    {
+      id: 'dispatch-log-seed-2',
+      createdAt: new Date(now - 1000 * 60 * 12).toISOString(),
+      dispatcherAccountId: DEMO_DISPATCHER_ACCOUNT_ID,
+      kind: 'anomaly',
+      message: 'Sistem detektovao vozilo van funkcije: Mirza P.',
+      driverId: 'drv-mirza',
+    },
+    {
+      id: 'dispatch-log-seed-3',
+      createdAt: new Date(now - 1000 * 60 * 7).toISOString(),
+      dispatcherAccountId: DEMO_DISPATCHER_ACCOUNT_ID,
+      kind: 'complaint',
+      message: 'Reklamacija u obradi: kašnjenje na vožnji ride-seed-5.',
+      rideId: 'ride-seed-5',
+      complaintId: 'cmp-1',
+    },
+    {
+      id: 'dispatch-log-seed-reassign-1',
+      createdAt: new Date(now - 1000 * 60 * 45).toISOString(),
+      dispatcherAccountId: DEMO_DISPATCHER_ACCOUNT_ID,
+      kind: 'ride',
+      message: 'Preraspodjela vožnje na vozača Kenan H.',
+      rideId: 'ride-seed-2',
+      requestId: 'req-seed-2',
+      driverId: 'drv-kenan',
+      meta: { action: 'reassign', previousDriverId: 'drv-mirza', newDriverId: 'drv-kenan' },
+    },
+    {
+      id: 'dispatch-log-seed-reassign-2',
+      createdAt: new Date(now - 1000 * 60 * 90).toISOString(),
+      dispatcherAccountId: DEMO_DISPATCHER_ACCOUNT_ID,
+      kind: 'ride',
+      message: 'Preraspodjela vožnje na vozača Mirza P.',
+      rideId: 'ride-seed-4',
+      requestId: 'req-seed-4',
+      driverId: 'drv-mirza',
+      meta: { action: 'reassign', previousDriverId: 'drv-kenan', newDriverId: 'drv-mirza' },
+    },
+  ]
+}
 
 export function createDefaultDriverUi(): DriverUiState {
   const t0 = Date.now()
@@ -909,6 +1188,10 @@ export function ensureDriverData(db: MockDatabase): boolean {
     'drv-nermin': driverAvatarNermin,
     'drv-eldar': driverAvatarEldar,
     'drv-mirza': driverAvatarMirza,
+    'drv-senad': driverAvatarNermin,
+    'drv-ajla': driverAvatarEldar,
+    'drv-haris': driverAvatarAmir,
+    'drv-emina': driverAvatarMirza,
   }
   for (const driver of db.drivers) {
     const seededAvatar = avatarByDriverId[driver.id]
@@ -927,24 +1210,129 @@ export function ensureDriverData(db: MockDatabase): boolean {
   return changed
 }
 
+/** Migracija / dopuna mock baze za dispečerski modul */
+export function ensureDispatchData(db: MockDatabase): boolean {
+  let changed = false
+  if (db.version < 3) {
+    db.version = 3
+    changed = true
+  }
+  if (!Array.isArray(db.dispatcherProfiles)) {
+    db.dispatcherProfiles = []
+    changed = true
+  }
+  if (!Array.isArray(db.dispatchLogs)) {
+    db.dispatchLogs = createDefaultDispatchLogs()
+    changed = true
+  }
+  if (!Array.isArray(db.dispatchAcknowledgedAnomalyIds)) {
+    db.dispatchAcknowledgedAnomalyIds = []
+    changed = true
+  }
+  if (!db.users.some((u) => u.id === DEMO_DISPATCHER_ACCOUNT_ID)) {
+    db.users.push({ ...demoDispatcherUser })
+    changed = true
+  }
+  const dispatcherUser = db.users.find((u) => u.id === DEMO_DISPATCHER_ACCOUNT_ID)
+  if (dispatcherUser && dispatcherUser.role !== 'dispecer') {
+    dispatcherUser.role = 'dispecer'
+    changed = true
+  }
+  if (!db.dispatcherProfiles.some((p) => p.accountId === DEMO_DISPATCHER_ACCOUNT_ID)) {
+    db.dispatcherProfiles.push({ ...demoDispatcherProfile })
+    changed = true
+  }
+  if (!db.users.some((u) => u.id === DISPATCH_PHONE_USER_ID)) {
+    db.users.push({ ...dispatchPhoneUser })
+    changed = true
+  }
+  if (!db.profiles.some((p) => p.id === DISPATCH_PHONE_PROFILE_ID)) {
+    db.profiles.push({ ...dispatchPhoneProfile })
+    changed = true
+  }
+  if (!db.rideRequests.some((r) => r.id === dispatchActiveRequest.id)) {
+    db.rideRequests.push(structuredClone(dispatchActiveRequest))
+    changed = true
+  }
+  if (!db.rides.some((r) => r.id === dispatchActiveRide.id)) {
+    db.rides.push(structuredClone(dispatchActiveRide))
+    changed = true
+  }
+  if (!db.rideRequests.some((r) => r.id === dispatchAssignedRequest.id)) {
+    db.rideRequests.push(structuredClone(dispatchAssignedRequest))
+    changed = true
+  }
+  if (!db.rides.some((r) => r.id === dispatchAssignedRide.id)) {
+    db.rides.push(structuredClone(dispatchAssignedRide))
+    changed = true
+  }
+  const nermin = db.drivers.find((d) => d.id === dispatchActiveRide.driverId)
+  if (nermin && nermin.availabilityStatus === 'dostupan') {
+    nermin.availabilityStatus = 'zauzet'
+    changed = true
+  }
+  const eldar = db.drivers.find((d) => d.id === dispatchAssignedRide.driverId)
+  if (eldar && eldar.availabilityStatus === 'dostupan') {
+    eldar.availabilityStatus = 'zauzet'
+    changed = true
+  }
+  const scheduled3 = db.rideRequests.find((r) => r.id === 'req-seed-scheduled-3')
+  if (scheduled3 && scheduled3.status === 'dodijeljen' && !scheduled3.rideId) {
+    scheduled3.status = 'u_obradi'
+    scheduled3.pickup = loc('loc-kosevo')
+    scheduled3.destination = loc('loc-dobrinja')
+    changed = true
+  }
+  if (db.dispatchLogs.length === 0) {
+    db.dispatchLogs = createDefaultDispatchLogs()
+    changed = true
+  }
+  if (db.version < 4) {
+    for (const vehicle of vehicles.filter((v) => v.id.startsWith('veh-') && ['veh-5', 'veh-6', 'veh-7', 'veh-8'].includes(v.id))) {
+      if (!db.vehicles.some((v) => v.id === vehicle.id)) {
+        db.vehicles.push(structuredClone(vehicle))
+        changed = true
+      }
+    }
+    for (const driver of drivers.filter((d) =>
+      ['drv-senad', 'drv-ajla', 'drv-haris', 'drv-emina'].includes(d.id),
+    )) {
+      if (!db.drivers.some((d) => d.id === driver.id)) {
+        db.drivers.push(structuredClone(driver))
+        changed = true
+      }
+    }
+    db.version = 4
+    changed = true
+  }
+  return changed
+}
+
 export function createFreshSeed(): MockDatabase {
   return {
-    version: 2,
-    users: [demoUser, { ...demoDriverUser }],
-    profiles: [demoProfile],
+    version: 4,
+    users: [demoUser, { ...demoDriverUser }, { ...demoDispatcherUser }, { ...dispatchPhoneUser }],
+    profiles: [demoProfile, { ...dispatchPhoneProfile }],
     driverProfiles: [{ ...demoDriverProfile }],
+    dispatcherProfiles: [{ ...demoDispatcherProfile }],
     driverUiByAccountId: {
       [DEMO_DRIVER_ACCOUNT_ID]: createDefaultDriverUi(),
     },
     drivers: structuredClone(drivers),
     driverAvatarPendingRequests: [],
     vehicles: structuredClone(vehicles),
-    rideRequests: structuredClone(demoScheduledRequests),
-    rides: structuredClone(demoPassengerRides),
+    rideRequests: [
+      ...structuredClone(demoScheduledRequests),
+      structuredClone(dispatchActiveRequest),
+      structuredClone(dispatchAssignedRequest),
+    ],
+    rides: [...structuredClone(demoPassengerRides), structuredClone(dispatchActiveRide), structuredClone(dispatchAssignedRide)],
     passengerDemoHistoryCleared: false,
     ratings,
     complaints,
     activityLogs: [],
+    dispatchLogs: createDefaultDispatchLogs(),
+    dispatchAcknowledgedAnomalyIds: [],
     notifications: [],
     currentUserId: null,
     pendingVerificationAccountIds: [],

@@ -109,7 +109,7 @@ export function DriverDemoPanel({ accountId }: { accountId: string }) {
 
   const outlineBtn =
     'border-slate-200 hover:border-brand-yellow/45 hover:bg-brand-yellow/5 text-brand-navy'
-  const dangerOutline = 'border-2 border-red-200 text-red-700 hover:bg-red-50'
+  const dangerOutline = 'border-2 border-brand-danger/30 text-brand-danger hover:bg-brand-danger/10'
 
   return (
     <div className={demoGlassPanelClass}>

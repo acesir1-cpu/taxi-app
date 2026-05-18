@@ -131,7 +131,7 @@ export function DriverHistoryPage() {
                       <span className="font-medium text-slate-500">{t.driver.historyStatus}:</span>{' '}
                       <span className="font-semibold">{statusLabel(h.status)}</span>
                       {h.rating != null ? (
-                        <span className="ml-2 text-amber-600">★ {h.rating}</span>
+                        <span className="ml-2 text-brand-yellow-dark">★ {h.rating}</span>
                       ) : null}
                     </p>
                   </div>

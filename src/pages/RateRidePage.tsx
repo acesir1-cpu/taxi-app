@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { Star } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { PassengerInvoiceLink } from '../components/passenger/PassengerInvoiceLink'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
 import { getDriverById, getRatingForRide, getRideById, rateRide } from '../services/rideApi'
@@ -10,8 +11,26 @@ import { useToastStore } from '../store/notificationStore'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { Textarea } from '../components/ui/textarea'
+import { useLangRefresh } from '../hooks/useLangRefresh'
+
+function RideCompletedInvoiceCard({ rideId, priceBam }: { rideId: string; priceBam: number }) {
+  const t = strings()
+  return (
+    <Card className="border-brand-teal/25 bg-brand-teal/5">
+      <CardContent className="space-y-3 pt-5">
+        <motion.div>
+          <p className="text-xs font-bold uppercase tracking-wide text-brand-teal">{t.rating.rideCompleted}</p>
+          <p className="mt-1 text-2xl font-extrabold tabular-nums text-brand-navy">{priceBam.toFixed(2)} BAM</p>
+          <p className="mt-1 text-sm text-slate-600">{t.documents.invoiceHint}</p>
+        </motion.div>
+        <PassengerInvoiceLink rideId={rideId} className="w-full" size="lg" />
+      </CardContent>
+    </Card>
+  )
+}
 
 export function RateRidePage() {
+  useLangRefresh()
   const t = strings()
   const { rideId } = useParams()
   const { me } = useOutletContext<AppOutletContext>()
@@ -60,23 +79,38 @@ export function RateRidePage() {
     navigate('/app/history', { replace: true })
   }
 
-  if (existing.data) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center text-sm text-slate-600">{t.rating.already}</CardContent>
-      </Card>
-    )
-  }
-
   const ride = rideQuery.data
   const driver = driverQuery.data
+  const ridePrice = ride ? (ride.finalPrice ?? ride.estimatedPrice) : 0
+  const canInvoice = ride?.status === 'zavrsena' && !!rideId
+
+  if (existing.data) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mx-auto max-w-lg space-y-4"
+      >
+        {canInvoice ? <RideCompletedInvoiceCard rideId={rideId!} priceBam={ridePrice} /> : null}
+        <Card>
+          <CardContent className="space-y-4 py-8 text-center">
+            <p className="text-sm text-slate-600">{t.rating.already}</p>
+            <Button variant="secondary" className="w-full" onClick={() => navigate('/app/history', { replace: true })}>
+              {t.history.title}
+            </Button>
+          </CardContent>
+        </Card>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="mx-auto max-w-lg space-y-4 max-md:flex max-md:min-h-[72vh] max-md:items-center max-md:justify-center"
+      className="mx-auto max-w-lg space-y-4 max-md:flex max-md:min-h-[72vh] max-md:flex-col max-md:items-center max-md:justify-center"
     >
+      {canInvoice ? <RideCompletedInvoiceCard rideId={rideId!} priceBam={ridePrice} /> : null}
       <Card>
         <CardHeader>
           <CardTitle>{t.rating.title}</CardTitle>

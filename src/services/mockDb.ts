@@ -1,4 +1,4 @@
-import { createFreshSeed, ensureDriverData } from '../data/seed'
+import { createFreshSeed, ensureDispatchData, ensureDriverData } from '../data/seed'
 import type { DriverAvailability, MockDatabase, RideRequestStatus, RideStatus, VehicleStatus } from '../types/domain'
 import { loadRaw, saveRaw } from '../utils/storage'
 
@@ -59,9 +59,10 @@ const RIDE_STATUS_MAP: Record<string, RideStatus> = {
 function normalizeDb(db: MockDatabase): boolean {
   let changed = false
   if (ensureDriverData(db)) changed = true
+  if (ensureDispatchData(db)) changed = true
   for (const u of db.users) {
     const r = u as { role?: string }
-    if (r.role !== 'putnik' && r.role !== 'vozac') {
+    if (r.role !== 'putnik' && r.role !== 'vozac' && r.role !== 'dispecer') {
       r.role = 'putnik'
       changed = true
     }

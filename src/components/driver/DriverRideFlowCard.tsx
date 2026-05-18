@@ -16,6 +16,7 @@ import { useToastStore } from '../../store/notificationStore'
 import { Button } from '../ui/button'
 import { Card, CardContent, CardHeader, CardTitle, passengerAppCardClassName } from '../ui/card'
 import { cn } from '../../lib/utils'
+import { driverDestructiveButtonClass, driverProgressStepClass } from './driverUi'
 import { CancelRideModal } from './CancelRideModal'
 import { ProblemReportModal } from './ProblemReportModal'
 function stepVisual(flow: DriverRideFlowStatus, index: number): 'done' | 'current' | 'todo' {
@@ -159,20 +160,8 @@ export function DriverRideFlowCard({ accountId, ui }: { accountId: string; ui: D
               const st = phaseVisual(flow, i)
               return (
                 <li key={label} className="flex flex-col items-center gap-2 text-center">
-                  <span
-                    className={cn(
-                      'h-2.5 w-full rounded-full',
-                      st === 'done' && 'bg-emerald-500',
-                      st === 'current' && 'bg-brand-yellow',
-                      st === 'todo' && 'bg-slate-200'
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'text-xs font-semibold',
-                      st === 'current' ? 'text-brand-navy' : st === 'done' ? 'text-emerald-800' : 'text-slate-500'
-                    )}
-                  >
+                  <span className={cn('h-2.5 w-full rounded-full', driverProgressStepClass(st, 'bar'))} />
+                  <span className={cn('text-xs font-semibold', driverProgressStepClass(st, 'text'))}>
                     {label}
                   </span>
                 </li>
@@ -187,19 +176,12 @@ export function DriverRideFlowCard({ accountId, ui }: { accountId: string; ui: D
                   <span
                     className={cn(
                       'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold',
-                      st === 'done' && 'bg-emerald-500 text-white',
-                      st === 'current' && 'bg-brand-yellow text-brand-navy ring-2 ring-brand-yellow-dark/40',
-                      st === 'todo' && 'bg-slate-200 text-slate-500'
+                      driverProgressStepClass(st, 'circle')
                     )}
                   >
                     {st === 'done' ? <Check className="h-4 w-4" /> : i + 1}
                   </span>
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      st === 'current' ? 'text-brand-navy' : st === 'done' ? 'text-emerald-800' : 'text-slate-500'
-                    )}
-                  >
+                  <span className={cn('text-sm font-medium', driverProgressStepClass(st, 'text'))}>
                     {label}
                   </span>
                 </li>
@@ -230,7 +212,7 @@ export function DriverRideFlowCard({ accountId, ui }: { accountId: string; ui: D
               <AlertCircle className="mr-2 h-4 w-4" />
               Prijavi problem
             </Button>
-            <Button variant="outlineThin" className="min-h-11 flex-1 text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setCancelOpen(true)}>
+            <Button variant="outlineThin" className={driverDestructiveButtonClass('flex-1')} onClick={() => setCancelOpen(true)}>
               Otkaži vožnju
             </Button>
           </div>

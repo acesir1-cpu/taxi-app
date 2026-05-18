@@ -424,11 +424,15 @@ export async function driverDemoForcePhase(
   if (!ride) return { error: 'Nema aktivne vožnje.' }
 
   if (phase === 'vozac_na_putu') {
-    ride.flowStatus = 'vozac_na_putu'
     ride.arrivedAt = undefined
     const start = generateDriverStartNearPickup(ride.pickup)
     ride.driverLat = start.lat
     ride.driverLng = start.lng
+    // Ponovno pokretanje animacije ako je faza već bila „na putu”.
+    if (ride.flowStatus === 'vozac_na_putu') {
+      ride.flowStatus = 'prihvacena'
+    }
+    ride.flowStatus = 'vozac_na_putu'
     pushLog(accountId, 'vožnja', 'Faza: vozač na putu.', { vožnjaId: ride.id })
     persist()
     return { ok: true }

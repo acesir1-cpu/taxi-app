@@ -22,7 +22,7 @@ export function CancelRideModal({
     <div className="fixed inset-0 z-[400] grid place-items-center bg-black/45 p-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-xl">
         <h3 className="text-lg font-semibold text-brand-navy">Otkaži vožnju</h3>
-        <p className="mt-2 rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-950">
+        <p className="mt-2 rounded-xl border border-brand-yellow/25 bg-brand-yellow/10 px-3 py-2 text-sm text-brand-navy">
           Dispečer i korisnik će biti obaviješteni. Razlog je obavezan.
         </p>
         <div className="mt-4">

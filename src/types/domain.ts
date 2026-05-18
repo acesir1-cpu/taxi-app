@@ -43,6 +43,8 @@ export type ComplaintCategory =
 
 export type UserRole = 'putnik' | 'vozac' | 'dispecer'
 
+export type DispatcherRoleLevel = 'obicni_dispecer' | 'senior_dispecer' | 'sef_smjene'
+
 export interface UserAccount {
   id: string
   role: UserRole
@@ -89,6 +91,19 @@ export interface DriverUserProfile {
 }
 
 /** Zahtjev za vožnju prikazan vozaču */
+export interface DispatcherProfile {
+  id: string
+  accountId: string
+  firstName: string
+  lastName: string
+  fullName: string
+  email: string
+  phone: string
+  roleLevel: DispatcherRoleLevel
+  shiftName: string
+  registeredAt: string
+}
+
 export interface DriverIncomingRequest {
   id: string
   pickup: Location
@@ -262,7 +277,7 @@ export interface DriverUiState {
 export type AuthSession =
   | { kind: 'passenger'; account: UserAccount; profile: PassengerProfile }
   | { kind: 'driver'; account: UserAccount; driverProfile: DriverUserProfile }
-  | { kind: 'dispatcher'; account: UserAccount }
+  | { kind: 'dispatcher'; account: UserAccount; dispatcherProfile: DispatcherProfile }
 
 export interface Location {
   id: string
@@ -376,6 +391,7 @@ export type ActivityLogType =
   | 'rating'
   | 'complaint'
   | 'profile'
+  | 'dispatch'
   | 'system'
 
 export interface ActivityLog {
@@ -386,6 +402,29 @@ export interface ActivityLog {
   createdAt: string
   oldValue?: string
   newValue?: string
+}
+
+export type DispatchLogKind =
+  | 'auth'
+  | 'ride'
+  | 'driver'
+  | 'complaint'
+  | 'anomaly'
+  | 'rbac'
+  | 'note'
+  | 'system'
+
+export interface DispatchLog {
+  id: string
+  createdAt: string
+  dispatcherAccountId?: string
+  kind: DispatchLogKind
+  message: string
+  rideId?: string
+  requestId?: string
+  driverId?: string
+  complaintId?: string
+  meta?: Record<string, string | number | boolean | undefined>
 }
 
 export type { AppNotification } from './notifications'
@@ -414,6 +453,7 @@ export interface MockDatabase {
   users: UserAccount[]
   profiles: PassengerProfile[]
   driverProfiles: DriverUserProfile[]
+  dispatcherProfiles: DispatcherProfile[]
   /** Po accountId vozača */
   driverUiByAccountId: Record<string, DriverUiState>
   drivers: Driver[]
@@ -426,6 +466,8 @@ export interface MockDatabase {
   ratings: Rating[]
   complaints: Complaint[]
   activityLogs: ActivityLog[]
+  dispatchLogs: DispatchLog[]
+  dispatchAcknowledgedAnomalyIds: string[]
   notifications: import('./notifications').AppNotification[]
   currentUserId: string | null
   /** Emails/phones pending verification */

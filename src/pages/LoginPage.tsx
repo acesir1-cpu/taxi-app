@@ -8,6 +8,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   DEMO_DRIVER_EMAIL,
   DEMO_DRIVER_PASSWORD,
+  DEMO_DISPATCHER_EMAIL,
+  DEMO_DISPATCHER_PASSWORD,
   DEMO_PASSENGER_EMAIL,
   DEMO_PASSENGER_PASSWORD,
 } from '../data/seed'
@@ -19,12 +21,24 @@ import { useToastStore } from '../store/notificationStore'
 import { GoogleGIcon } from '../components/icons/GoogleGIcon'
 import { AuthInput, PrimaryButton, SecondaryButton, RoleToggle, Field, Divider } from '../components/auth/authPrimitives'
 
-type AuthMode = 'passenger' | 'driver'
+type AuthMode = 'passenger' | 'driver' | 'dispatcher'
 
 function demoLoginValues(mode: AuthMode): LoginFormValues {
-  return mode === 'passenger'
-    ? { identifier: DEMO_PASSENGER_EMAIL, password: DEMO_PASSENGER_PASSWORD }
-    : { identifier: DEMO_DRIVER_EMAIL, password: DEMO_DRIVER_PASSWORD }
+  if (mode === 'driver') return { identifier: DEMO_DRIVER_EMAIL, password: DEMO_DRIVER_PASSWORD }
+  if (mode === 'dispatcher') return { identifier: DEMO_DISPATCHER_EMAIL, password: DEMO_DISPATCHER_PASSWORD }
+  return { identifier: DEMO_PASSENGER_EMAIL, password: DEMO_PASSENGER_PASSWORD }
+}
+
+function roleHome(role: 'putnik' | 'vozac' | 'dispecer'): string {
+  if (role === 'vozac') return '/driver'
+  if (role === 'dispecer') return '/dispatch'
+  return '/app/order'
+}
+
+function submitLabel(mode: AuthMode, t: ReturnType<typeof strings>): string {
+  if (mode === 'driver') return `${t.auth.loginTitle} (${t.auth.driverMode})`
+  if (mode === 'dispatcher') return t.dispatcher.login.submit
+  return t.welcome.login
 }
 
 export function LoginPage() {
@@ -39,8 +53,18 @@ export function LoginPage() {
   const push = useToastStore((s) => s.push)
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
     defaultValues: demoLoginValues('passenger'),
   })
+
+  function clearLoginServerErrors() {
+    const idType = form.getFieldState('identifier').error?.type
+    const pwdType = form.getFieldState('password').error?.type
+    if (idType === 'server' || pwdType === 'server') {
+      form.clearErrors(['identifier', 'password'])
+    }
+  }
 
   useEffect(() => {
     form.reset(demoLoginValues(authMode))
@@ -53,13 +77,16 @@ export function LoginPage() {
       if ('error' in res) {
         if (res.error === 'blocked') push(s.auth.blocked, 'error')
         else if (res.error === 'inactive') push(s.auth.inactive, 'error')
-        else push(s.auth.invalidCreds, 'error')
+        else {
+          form.setError('identifier', { type: 'server', message: s.auth.invalidCreds })
+          form.setError('password', { type: 'server' })
+        }
         return
       }
       await qc.invalidateQueries({ queryKey: ['me'] })
       await qc.invalidateQueries({ queryKey: ['driverUi'] })
       push(s.notifications.loginOk, 'success')
-      navigate(res.role === 'vozac' ? '/driver' : '/app/order', { replace: true })
+      navigate(roleHome(res.role), { replace: true })
     },
     onError: () => push(strings().common.error, 'error'),
   })
@@ -71,7 +98,7 @@ export function LoginPage() {
       await qc.invalidateQueries({ queryKey: ['me'] })
       await qc.invalidateQueries({ queryKey: ['driverUi'] })
       push(s.notifications.loginOk, 'success')
-      navigate(res.role === 'vozac' ? '/driver' : '/app/order', { replace: true })
+      navigate(roleHome(res.role), { replace: true })
     },
   })
 
@@ -99,6 +126,7 @@ export function LoginPage() {
         onChange={setAuthMode}
         passengerLabel={t.auth.passengerMode}
         driverLabel={t.auth.driverMode}
+        dispatcherLabel={t.auth.dispatcherMode}
       />
 
       <form
@@ -109,10 +137,11 @@ export function LoginPage() {
           label={t.auth.loginIdentifierLabel}
           htmlFor="login-idf"
           error={form.formState.errors.identifier?.message}
+          invalid={!!form.formState.errors.identifier}
         >
           <AuthInput
             id="login-idf"
-            {...form.register('identifier')}
+            {...form.register('identifier', { onChange: () => clearLoginServerErrors() })}
             autoComplete="username"
             placeholder={t.auth.loginIdentifierLabel}
           />
@@ -122,6 +151,7 @@ export function LoginPage() {
           label={t.auth.password}
           htmlFor="login-pwd"
           error={form.formState.errors.password?.message}
+          invalid={!!form.formState.errors.password}
           right={
             <Link
               to="/reset-password"
@@ -134,7 +164,7 @@ export function LoginPage() {
         >
           <PasswordInput
             id="login-pwd"
-            {...form.register('password')}
+            {...form.register('password', { onChange: () => clearLoginServerErrors() })}
             autoComplete="current-password"
             placeholder={t.auth.password}
             show={showPwd}
@@ -144,7 +174,7 @@ export function LoginPage() {
 
         <PrimaryButton type="submit" disabled={submitting}>
           {mut.isPending ? <Loader2 className="h-5 w-5 shrink-0 animate-spin" aria-hidden /> : null}
-          <span>{mut.isPending ? t.common.loading : t.welcome.login}</span>
+          <span>{mut.isPending ? t.common.loading : submitLabel(authMode, t)}</span>
         </PrimaryButton>
 
         <Divider label={t.welcome.orDivider} />
@@ -175,12 +205,17 @@ export function LoginPage() {
 
 const PasswordInput = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement> & { show: boolean; onToggleShow: () => void }
->(function PasswordInput({ show, onToggleShow, ...props }, ref) {
+  React.InputHTMLAttributes<HTMLInputElement> & {
+    show: boolean
+    onToggleShow: () => void
+    invalid?: boolean
+  }
+>(function PasswordInput({ show, onToggleShow, invalid, ...props }, ref) {
   return (
     <div className="relative">
       <AuthInput
         ref={ref}
+        invalid={invalid}
         type={show ? 'text' : 'password'}
         {...props}
         style={{ paddingRight: 44, ...props.style }}

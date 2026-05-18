@@ -1,16 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CalendarClock, Clock3, MapPin, PencilLine, Plus, Trash2 } from 'lucide-react'
+import { CalendarClock, Clock3, MapPin, PencilLine, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
-import { strings, type AppMessages } from '../i18n/strings'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
+import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
-import type { Location, RideRequest, RideRequestStatus } from '../types/domain'
+import type { Location, RideRequest } from '../types/domain'
+import { rideRequestStatusLabel, rideRequestStatusToneClass } from '../lib/passengerStatusLabels'
 import {
   cancelRideRequest,
   getScheduledRideRequests,
   updateScheduledRideRequest,
 } from '../services/rideApi'
 import { LocationSearch } from '../components/ride/LocationSearch'
+import { ScheduledRideCancelButton } from '../components/ride/ScheduledRideCancelButton'
 import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
@@ -82,8 +84,8 @@ export function ScheduledRidesPage() {
                   <p className="line-clamp-3 text-[0.95rem] font-bold leading-snug text-brand-navy md:hidden">
                     {request.pickup.label} {'\u2192'} {request.destination.label}
                   </p>
-                  <span className={scheduledRequestStatusBadgeClass(request.status)}>
-                    {scheduledRequestStatusLabel(request.status, t.order.scheduledRequestStatus)}
+                  <span className={rideRequestStatusToneClass(request.status)}>
+                    {rideRequestStatusLabel(request.status, t.order.scheduledRequestStatus)}
                   </span>
                 </div>
               </CardHeader>
@@ -108,7 +110,10 @@ export function ScheduledRidesPage() {
                   </p>
                   <p className="text-xs font-bold text-indigo-700">{request.estimatedPrice.toFixed(2)} BAM</p>
                 </div>
-                <div className="flex gap-2 pt-0.5">
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  <Button variant="outline" size="sm" className="w-full" asChild>
+                    <Link to={`/app/documents/booking_confirmation/${request.id}`}>{t.documents.openBookingConfirmation}</Link>
+                  </Button>
                   <button
                     type="button"
                     className="flex h-10 min-h-0 flex-1 items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-[#E5E7EB] bg-transparent text-sm font-semibold text-brand-navy transition active:scale-[0.98]"
@@ -117,15 +122,12 @@ export function ScheduledRidesPage() {
                     <PencilLine className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     {t.common.edit}
                   </button>
-                  <button
-                    type="button"
-                    className="flex h-10 min-h-0 flex-1 items-center justify-center gap-2 rounded-[10px] border-[1.5px] border-[#FECACA] bg-transparent text-sm font-semibold text-[#EF4444] transition active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50"
+                  <ScheduledRideCancelButton
+                    label={t.ride.cancel}
                     disabled={cancelMut.isPending}
+                    className="flex h-10 flex-1 text-sm"
                     onClick={() => setCancelConfirm(request)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    {t.ride.cancel}
-                  </button>
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -312,28 +314,3 @@ function toLocalDateTimeValue(date: Date): string {
   return `${y}-${m}-${d}T${h}:${min}`
 }
 
-function scheduledRequestStatusLabel(
-  status: RideRequestStatus,
-  messages: AppMessages['order']['scheduledRequestStatus']
-): string {
-  return messages[status] ?? status
-}
-
-function scheduledRequestStatusBadgeClass(status: RideRequestStatus): string {
-  const base =
-    'inline-flex max-w-[100%] shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-tight tracking-normal'
-  switch (status) {
-    case 'prihvacen':
-    case 'dodijeljen':
-      return `${base} bg-emerald-100 text-emerald-800`
-    case 'otkazan':
-      return `${base} bg-rose-100 text-rose-800`
-    case 'neuspjesan':
-      return `${base} bg-orange-100 text-orange-900`
-    case 'u_obradi':
-      return `${base} bg-amber-100 text-amber-900`
-    case 'kreiran':
-    default:
-      return `${base} bg-slate-100 text-slate-700`
-  }
-}

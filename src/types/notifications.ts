@@ -1,4 +1,4 @@
-export type NotificationTargetApp = 'passenger' | 'driver' | 'both'
+export type NotificationTargetApp = 'passenger' | 'driver' | 'dispatcher' | 'both'
 
 export type NotificationType =
   | 'RIDE_REQUESTED'
@@ -20,6 +20,9 @@ export type NotificationType =
   | 'SHIFT_ENDED'
   | 'EARNINGS_SUMMARY'
   | 'LOW_RATING_ALERT'
+  | 'DISPATCH_ANOMALY'
+  | 'DISPATCH_COMPLAINT'
+  | 'DISPATCH_RBAC_DENIED'
   | 'ACCOUNT_LOGIN'
   | 'ACCOUNT_UPDATE'
   | 'PROMO_CODE'
@@ -46,4 +49,6 @@ export const BANNER_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set(
   'RIDE_COMPLETED',
   'PASSENGER_CANCELLED',
   'NEW_RIDE_OFFER',
+  'DISPATCH_ANOMALY',
+  'DISPATCH_COMPLAINT',
 ])

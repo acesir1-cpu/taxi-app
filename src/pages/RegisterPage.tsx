@@ -18,6 +18,7 @@ export function RegisterPage() {
   useLangRefresh()
   const t = strings()
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [termsError, setTermsError] = useState<string | undefined>()
   const [showPwd, setShowPwd] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const registerSchema = useMemo(() => buildRegisterSchema(t), [t])
@@ -26,6 +27,8 @@ export function RegisterPage() {
   const push = useToastStore((s) => s.push)
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
+    mode: 'onSubmit',
+    reValidateMode: 'onChange',
     defaultValues: {
       firstName: '',
       lastName: '',
@@ -41,7 +44,12 @@ export function RegisterPage() {
     onSuccess: async (res) => {
       const s = strings()
       if ('error' in res) {
-        push(res.error === 'exists' ? s.auth.exists : s.common.error, 'error')
+        if (res.error === 'exists') {
+          form.setError('email', { type: 'server', message: s.auth.exists })
+          form.setError('phone', { type: 'server' })
+        } else {
+          push(s.common.error, 'error')
+        }
         return
       }
       setPendingVerifyAccountId(res.accountId)
@@ -52,11 +60,20 @@ export function RegisterPage() {
     onError: () => push(strings().common.error, 'error'),
   })
 
+  function clearRegisterServerErrors() {
+    const emailType = form.getFieldState('email').error?.type
+    const phoneType = form.getFieldState('phone').error?.type
+    if (emailType === 'server' || phoneType === 'server') {
+      form.clearErrors(['email', 'phone'])
+    }
+  }
+
   function onSubmit(v: RegisterFormValues) {
     if (!acceptedTerms) {
-      push(t.auth.acceptTermsError, 'error')
+      setTermsError(t.auth.acceptTermsError)
       return
     }
+    setTermsError(undefined)
     mut.mutate({
       firstName: v.firstName,
       lastName: v.lastName,
@@ -80,7 +97,12 @@ export function RegisterPage() {
       <form className="mt-4 flex flex-col gap-3" onSubmit={form.handleSubmit(onSubmit)}>
         {/* Row 1: Ime / Prezime */}
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t.auth.firstName} htmlFor="reg-firstName" error={errors.firstName?.message}>
+          <Field
+            label={t.auth.firstName}
+            htmlFor="reg-firstName"
+            error={errors.firstName?.message}
+            invalid={!!errors.firstName}
+          >
             <AuthInput
               id="reg-firstName"
               {...form.register('firstName')}
@@ -88,7 +110,12 @@ export function RegisterPage() {
               placeholder={t.auth.firstNamePlaceholder}
             />
           </Field>
-          <Field label={t.auth.lastName} htmlFor="reg-lastName" error={errors.lastName?.message}>
+          <Field
+            label={t.auth.lastName}
+            htmlFor="reg-lastName"
+            error={errors.lastName?.message}
+            invalid={!!errors.lastName}
+          >
             <AuthInput
               id="reg-lastName"
               {...form.register('lastName')}
@@ -99,27 +126,43 @@ export function RegisterPage() {
         </div>
 
         {/* Row 2: Email */}
-        <Field label={t.auth.email} htmlFor="reg-email" error={errors.email?.message}>
+        <Field
+          label={t.auth.email}
+          htmlFor="reg-email"
+          error={errors.email?.message}
+          invalid={!!errors.email}
+        >
           <AuthInput
             id="reg-email"
             type="email"
-            {...form.register('email')}
+            {...form.register('email', { onChange: () => clearRegisterServerErrors() })}
             autoComplete="email"
             placeholder={t.auth.emailPlaceholder}
           />
         </Field>
 
         {/* Row 3: Phone — jedan okvir kao ostala polja; +387 je samo prefiks */}
-        <Field label={t.auth.phone} htmlFor="reg-phone" error={errors.phone?.message}>
+        <Field
+          label={t.auth.phone}
+          htmlFor="reg-phone"
+          error={errors.phone?.message}
+          invalid={!!errors.phone}
+        >
           <PhoneInput
             placeholder={t.auth.phonePlaceholder}
-            register={form.register('phone')}
+            invalid={!!errors.phone}
+            register={form.register('phone', { onChange: () => clearRegisterServerErrors() })}
           />
         </Field>
 
         {/* Row 4: Lozinka / Potvrda lozinke */}
         <div className="grid grid-cols-2 gap-3">
-          <Field label={t.auth.password} htmlFor="reg-pwd" error={errors.password?.message}>
+          <Field
+            label={t.auth.password}
+            htmlFor="reg-pwd"
+            error={errors.password?.message}
+            invalid={!!errors.password}
+          >
             <PasswordInput
               id="reg-pwd"
               {...form.register('password')}
@@ -133,6 +176,7 @@ export function RegisterPage() {
             label={t.auth.confirmPassword}
             htmlFor="reg-cpwd"
             error={errors.confirmPassword?.message}
+            invalid={!!errors.confirmPassword}
           >
             <PasswordInput
               id="reg-cpwd"
@@ -148,7 +192,11 @@ export function RegisterPage() {
         {/* Custom checkbox */}
         <TermsCheckbox
           checked={acceptedTerms}
-          onChange={setAcceptedTerms}
+          onChange={(next) => {
+            setAcceptedTerms(next)
+            if (next) setTermsError(undefined)
+          }}
+          error={termsError}
           prefix={t.auth.acceptTermsPrefix}
           termsLink={t.auth.termsLink}
           privacyLink={t.auth.privacyLink}
@@ -173,12 +221,17 @@ export function RegisterPage() {
 
 const PasswordInput = React.forwardRef<
   HTMLInputElement,
-  React.InputHTMLAttributes<HTMLInputElement> & { show: boolean; onToggleShow: () => void }
->(function PasswordInput({ show, onToggleShow, ...props }, ref) {
+  React.InputHTMLAttributes<HTMLInputElement> & {
+    show: boolean
+    onToggleShow: () => void
+    invalid?: boolean
+  }
+>(function PasswordInput({ show, onToggleShow, invalid, ...props }, ref) {
   return (
     <div className="relative">
       <AuthInput
         ref={ref}
+        invalid={invalid}
         type={show ? 'text' : 'password'}
         {...props}
         style={{ paddingRight: 44, ...props.style }}
@@ -199,13 +252,18 @@ const PasswordInput = React.forwardRef<
 function PhoneInput({
   placeholder,
   register,
+  invalid = false,
 }: {
   placeholder: string
   register: UseFormRegisterReturn
+  invalid?: boolean
 }) {
   const { onBlur: regOnBlur, ...regRest } = register
   return (
-    <div className="phone-input-wrapper w-full">
+    <div
+      className={cn('phone-input-wrapper w-full', invalid && 'phone-input--invalid')}
+      aria-invalid={invalid || undefined}
+    >
       <span className="phone-prefix shrink-0 select-none" aria-hidden="true">
         +387
       </span>
@@ -226,6 +284,7 @@ function PhoneInput({
 function TermsCheckbox({
   checked,
   onChange,
+  error,
   prefix,
   termsLink,
   privacyLink,
@@ -233,13 +292,16 @@ function TermsCheckbox({
 }: {
   checked: boolean
   onChange: (next: boolean) => void
+  error?: string
   prefix: string
   termsLink: string
   privacyLink: string
   andWord: string
 }) {
+  const invalid = Boolean(error?.trim())
   return (
-    <label className="flex cursor-pointer items-start gap-3" style={{ marginTop: 4 }}>
+    <div className="flex flex-col gap-1.5" style={{ marginTop: 4 }}>
+      <label className="flex cursor-pointer items-start gap-3">
       <input
         type="checkbox"
         checked={checked}
@@ -253,8 +315,8 @@ function TermsCheckbox({
         )}
         style={{
           borderRadius: 4,
-          border: `1.5px solid ${checked ? '#F5A623' : '#E5E7EB'}`,
-          background: checked ? '#F5A623' : '#FFFFFF',
+          border: `1.5px solid ${invalid ? '#DC2626' : checked ? '#F5A623' : '#E5E7EB'}`,
+          background: invalid ? '#FEF2F2' : checked ? '#F5A623' : '#FFFFFF',
         }}
       >
         {checked ? <Check className="h-3 w-3 text-white" strokeWidth={3} /> : null}
@@ -269,6 +331,12 @@ function TermsCheckbox({
           {privacyLink}
         </Link>
       </span>
-    </label>
+      </label>
+      {error ? (
+        <p role="alert" style={{ fontSize: 11, color: '#DC2626', fontWeight: 500 }}>
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }
