@@ -1309,3 +1309,51 @@
 > - Upozorenje administraciji nakon učestalih neopravdanih otkazivanja vozača.
 > - Anomalija „Stari GPS signal" (lokacija nije osvježena duže od 10 min) u dispečerskom panelu.
 > - Perzistencija stanja nakon osvježavanja stranice (aktivna vožnja, historija, postavke).
+
+---
+
+# 6. Automatizovani testovi (integracijski + E2E)
+
+Pored ručnih UAT scenarija, ključni tokovi su pokriveni i **automatizovanim testovima** kao dodatni dokaz da je aplikacija testirana i da radi.
+
+**Status (verifikovano pokretanjem):** ✅ Integracijski: **3/3 PASS** · ✅ E2E: **4/4 PASS (Chromium)** · 📊 Coverage izvještaj se generiše uz `npm run test:cov` (`coverage/index.html`).
+
+> Napomena: automatski testovi ciljano pokrivaju **najkritičnije tokove** (prijava, kontrola pristupa, dispečerski ulaz); preostala funkcionalnost je pokrivena **ručnim UAT scenarijima** iz modula 1–5 ovog dokumenta. Zato je procenat coverage-a očekivano nizak — automatizacija je dodatni sloj dokaza, ne zamjena za UAT.
+
+## 6.1. Alati i pokretanje
+
+| Vrsta | Alat | Komanda | Izlaz / dokaz |
+|---|---|---|---|
+| Integracijski | Vitest + React Testing Library | `npm run test` (`npm run test:cov` za pokrivenost) | `coverage/index.html` |
+| E2E | Playwright (Chromium) | `npm run e2e` → `npm run e2e:report` | `playwright-report/index.html`, screenshotovi u `UAT/dokazi/` |
+
+**Prvo pokretanje (instalacija):**
+```
+npm install
+npx playwright install
+```
+
+## 6.2. Mapiranje automatskih testova na test caseove
+
+| Test case | Tip | Datoteka / naziv testa | Rezultat |
+|---|---|---|---|
+| TC_AUTH_006 | E2E | `e2e/auth.spec.ts › TC_AUTH_006 — uspješna prijava putnika` | ✅ PASS |
+| TC_AUTH_007 | E2E | `e2e/auth.spec.ts › TC_AUTH_007 — neispravni podaci` | ✅ PASS |
+| TC_AUTH_014 | E2E | `e2e/auth.spec.ts › TC_AUTH_014 — gost bez pristupa` | ✅ PASS |
+| TC_DISPATCH_001 | E2E | `e2e/dispatch.spec.ts › TC_DISPATCH_001 — pristup panelu` | ✅ PASS |
+| TC_AUTH_007 | Integracijski | `src/pages/__tests__/LoginPage.test.tsx › TC_AUTH_007` | ✅ PASS |
+| TC_AUTH_003 | Integracijski | `src/pages/__tests__/LoginPage.test.tsx › TC_AUTH_003` | ✅ PASS |
+| TC_AUTH_006 | Integracijski | `src/pages/__tests__/LoginPage.test.tsx › TC_AUTH_006` | ✅ PASS |
+
+## 6.3. Dokazi (screenshotovi)
+
+Playwright automatski generiše screenshot svakog E2E testa; dodatni dokazi se snimaju u `UAT/dokazi/` po konvenciji imenovanja:
+
+- `Slika 23.90: TC_AUTH_006_Prijava_validna` — `UAT/dokazi/TC_AUTH_006_Prijava_validna.png`
+- `Slika 23.91: TC_AUTH_007_Prijava_neispravna` — `UAT/dokazi/TC_AUTH_007_Prijava_neispravna.png`
+- `Slika 23.92: TC_AUTH_014_Gost_bez_pristupa` — `UAT/dokazi/TC_AUTH_014_Gost_bez_pristupa.png`
+- `Slika 23.93: TC_DISPATCH_001_Pristup_panelu` — `UAT/dokazi/TC_DISPATCH_001_Pristup_panelu.png`
+- `Slika 23.94: Playwright_HTML_izvjestaj` — screenshot zelenog HTML izvještaja (`npm run e2e:report`)
+- `Slika 23.95: Coverage_izvjestaj` — screenshot pokrivenosti (`coverage/index.html`)
+
+> Najuvjerljiviji vizuelni dokaz u izvještaju je **screenshot zelenog Playwright HTML izvještaja** (svi testovi PASS) i **coverage tabela**.

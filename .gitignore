@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Test artefakti (HTML izvještaji, pokrivenost)
+coverage
+playwright-report
+test-results
+.playwright
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

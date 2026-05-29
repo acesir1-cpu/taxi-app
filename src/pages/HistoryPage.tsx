@@ -216,6 +216,7 @@ export function HistoryPage() {
                   <RideHistoryCard
                     ride={r}
                     onRepeat={() => onRepeat(r)}
+                    onRate={() => navigate(`/app/rate/${r.id}`)}
                     accountId={me.account.id}
                     deleting={deleteRideMut.isPending}
                     onDelete={() => {
@@ -539,6 +540,7 @@ function ConfirmDeleteRideModal({
 function RideHistoryCard({
   ride,
   onRepeat,
+  onRate,
   accountId,
   onDelete,
   onProblem,
@@ -546,6 +548,7 @@ function RideHistoryCard({
 }: {
   ride: Ride
   onRepeat: () => void
+  onRate: () => void
   accountId: string
   onDelete: () => void
   onProblem: () => void
@@ -612,6 +615,15 @@ function RideHistoryCard({
               className="h-7 shrink-0 px-2.5 text-xs"
               label={t.history.viewInvoice}
             />
+          ) : null}
+          {ride.status === 'zavrsena' && !rated ? (
+            <button
+              type="button"
+              onClick={onRate}
+              className="inline-flex shrink-0 items-center rounded-full border border-brand-navy/25 bg-brand-navy/10 px-2.5 py-1 text-xs font-bold text-brand-navy transition-colors duration-150 hover:border-brand-navy/40 hover:bg-brand-navy/15"
+            >
+              {t.history.rate}
+            </button>
           ) : null}
           <div className="ml-auto flex items-center gap-2">
             <button
