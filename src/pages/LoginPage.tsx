@@ -83,10 +83,14 @@ export function LoginPage() {
         }
         return
       }
-      await qc.invalidateQueries({ queryKey: ['me'] })
-      await qc.invalidateQueries({ queryKey: ['driverUi'] })
-      push(s.notifications.loginOk, 'success')
-      navigate(roleHome(res.role), { replace: true })
+      try {
+        await qc.invalidateQueries({ queryKey: ['me'] })
+        await qc.invalidateQueries({ queryKey: ['driverUi'] })
+        push(s.notifications.loginOk, 'success')
+        navigate(roleHome(res.role), { replace: true })
+      } catch {
+        push(s.common.error, 'error')
+      }
     },
     onError: () => push(strings().common.error, 'error'),
   })

@@ -1,4 +1,4 @@
-import { DISPATCH_UPDATED_EVENT } from './dispatcherApi'
+import { DISPATCH_UPDATED_EVENT } from '../lib/dispatchEvents'
 import { getDb, persist } from './mockDb'
 import type {
   DriverActiveRide,

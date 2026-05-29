@@ -23,9 +23,10 @@ import { calculateRoute } from './locationApi'
 import { getDb, persist } from './mockDb'
 import { complaintStatusLabel } from '../lib/passengerStatusLabels'
 import { appendNotification } from './notificationApi'
+import { DISPATCH_UPDATED_EVENT } from '../lib/dispatchEvents'
 import { syncAllLinkedFleetDriversFromUi, syncFleetDriverToLinkedUi } from './driverFleetSync'
 
-export const DISPATCH_UPDATED_EVENT = 'urbanflow:dispatch-updated'
+export { DISPATCH_UPDATED_EVENT }
 
 export type DispatchPermission =
   | 'view_reports'
@@ -394,7 +395,11 @@ function buildAnomalies(rows: DispatchRideRow[], drivers: DispatchDriverRow[], c
 
 export async function getDispatchSnapshot(dispatcherAccountId: string): Promise<DispatchSnapshot> {
   await delay(16)
-  if (syncAllLinkedFleetDriversFromUi()) persist()
+  try {
+    if (syncAllLinkedFleetDriversFromUi()) persist()
+  } catch {
+    // Ne blokiraj dispečerski panel ako sinkronizacija flote padne.
+  }
   const dispatcher = profileFor(dispatcherAccountId)
   if (!dispatcher) throw new Error('not_dispatcher')
   const db = getDb()
