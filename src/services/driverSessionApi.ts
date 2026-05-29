@@ -11,7 +11,9 @@ import type {
   PaymentMethod,
 } from '../types/domain'
 import { delay } from './delay'
-import { getDb, persist } from './mockDb'
+import { commitDriverUi, syncLinkedFleetDriverFromUi } from './driverFleetSync'
+import { persist } from './mockDb'
+import { getDb } from './mockDb'
 import { clearDriverSettingsLocalStorage } from '../lib/driverSettingsLocal'
 
 function uid(prefix: string): string {
@@ -64,7 +66,7 @@ function uiFor(accountId: string): DriverUiState {
   const ui = db.driverUiByAccountId[accountId]
   if (!ui) {
     db.driverUiByAccountId[accountId] = createDefaultDriverUi()
-    persist()
+    commitDriverUi(accountId)
     migrateDriverUi(db.driverUiByAccountId[accountId])
     return db.driverUiByAccountId[accountId]
   }
@@ -147,7 +149,9 @@ export function buildTemplateRideRequest(): DriverIncomingRequest {
 
 export async function fetchDriverUi(accountId: string): Promise<DriverUiState> {
   await delay(80)
-  return structuredClone(uiFor(accountId))
+  const ui = uiFor(accountId)
+  if (syncLinkedFleetDriverFromUi(accountId)) persist()
+  return structuredClone(ui)
 }
 
 function blockers(ui: DriverUiState): string | null {
@@ -185,7 +189,7 @@ export async function driverStartShift(accountId: string): Promise<{ ok: true } 
     ui.pendingRequest = buildTemplateRideRequest()
     pushLog(accountId, 'zahtjev', 'Novi zahtjev za vožnju primljen.', { zahtjevId: ui.pendingRequest.id })
   }
-  persist()
+  commitDriverUi(accountId)
   await appendNotification({
     accountId,
     type: 'SHIFT_STARTED',
@@ -223,7 +227,7 @@ export async function driverPause(accountId: string): Promise<{ ok: true } | { e
     ui.pendingRequest = null
   }
   pushLog(accountId, 'status_vozaca', 'Status promijenjen: Pauza.')
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -245,7 +249,7 @@ export async function driverResume(accountId: string): Promise<{ ok: true } | { 
     ui.pendingRequest = buildTemplateRideRequest()
     pushLog(accountId, 'zahtjev', 'Novi zahtjev za vožnju primljen.', { zahtjevId: ui.pendingRequest.id })
   }
-  persist()
+  commitDriverUi(accountId)
   if (ui.pendingRequest) {
     await pushNewRideOffer(accountId, ui.pendingRequest)
   }
@@ -273,7 +277,7 @@ export async function driverEndShift(accountId: string): Promise<{ ok: true } | 
   ui.pendingRequest = null
   if (ui.vehicleUi.status !== 'van_funkcije') ui.vehicleUi.status = 'dostupno'
   pushLog(accountId, 'smjena', 'Smjena završena.')
-  persist()
+  commitDriverUi(accountId)
   const db = getDb()
   const dp = db.driverProfiles.find((p) => p.accountId === accountId)
   const ratingStr = dp ? dp.rating.toFixed(1) : '—'
@@ -340,7 +344,7 @@ export async function driverAcceptRequest(accountId: string): Promise<{ ok: true
   ui.availabilityStatus = 'zauzet'
   ui.vehicleUi.status = 'zauzeto'
   pushLog(accountId, 'vožnja', 'Vožnja prihvaćena.', { vožnjaId: ui.activeRide.id })
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -357,7 +361,7 @@ export async function driverRejectRequest(
   const rid = ui.pendingRequest.id
   ui.pendingRequest = null
   pushLog(accountId, 'zahtjev', `Zahtjev odbijen (${reason}).`, { zahtjevId: rid, napomena: note })
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -367,7 +371,7 @@ export async function scheduleNewRequestAfterReject(accountId: string, ms = 3200
   if (ui.availabilityStatus === 'dostupan' && !ui.activeRide && !ui.pendingRequest) {
     ui.pendingRequest = buildTemplateRideRequest()
     pushLog(accountId, 'zahtjev', 'Novi zahtjev dodijeljen nakon odbijanja.', { zahtjevId: ui.pendingRequest.id })
-    persist()
+    commitDriverUi(accountId)
     await pushNewRideOffer(accountId, ui.pendingRequest)
   }
 }
@@ -379,7 +383,7 @@ export async function driverPatchActiveRidePosition(accountId: string, lat: numb
   if (!ride) return
   ride.driverLat = lat
   ride.driverLng = lng
-  persist()
+  commitDriverUi(accountId)
 }
 
 export async function driverMarkArrived(accountId: string): Promise<{ ok: true } | { error: string }> {
@@ -395,7 +399,7 @@ export async function driverMarkArrived(accountId: string): Promise<{ ok: true }
   ride.driverLat = ride.pickup.lat
   ride.driverLng = ride.pickup.lng
   pushLog(accountId, 'vožnja', 'Stigli ste na lokaciju preuzimanja.', { vožnjaId: ride.id })
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -434,7 +438,7 @@ export async function driverDemoForcePhase(
     }
     ride.flowStatus = 'vozac_na_putu'
     pushLog(accountId, 'vožnja', 'Faza: vozač na putu.', { vožnjaId: ride.id })
-    persist()
+    commitDriverUi(accountId)
     return { ok: true }
   }
   if (phase === 'stigao') {
@@ -443,7 +447,7 @@ export async function driverDemoForcePhase(
     ride.driverLat = ride.pickup.lat
     ride.driverLng = ride.pickup.lng
     pushLog(accountId, 'vožnja', 'Faza: stigao.', { vožnjaId: ride.id })
-    persist()
+    commitDriverUi(accountId)
     return { ok: true }
   }
   if (phase === 'u_toku') {
@@ -452,14 +456,14 @@ export async function driverDemoForcePhase(
     ride.driverLat = ride.pickup.lat
     ride.driverLng = ride.pickup.lng
     pushLog(accountId, 'vožnja', 'Faza: u toku.', { vožnjaId: ride.id })
-    persist()
+    commitDriverUi(accountId)
     return { ok: true }
   }
   ride.flowStatus = 'u_toku'
   ride.driverLat = ride.destination.lat
   ride.driverLng = ride.destination.lng
   ride.startedAt = ride.startedAt ?? new Date().toISOString()
-  persist()
+  commitDriverUi(accountId)
   return driverCompleteRide(accountId)
 }
 
@@ -474,7 +478,7 @@ export async function driverStartRideLeg(accountId: string): Promise<{ ok: true 
   ride.flowStatus = 'u_toku'
   ride.startedAt = new Date().toISOString()
   pushLog(accountId, 'vožnja', 'Vožnja je pokrenuta.', { vožnjaId: ride.id })
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -527,7 +531,7 @@ export async function driverCompleteRide(accountId: string): Promise<
     ui.pendingRequest = buildTemplateRideRequest()
     pushLog(accountId, 'zahtjev', 'Novi zahtjev za vožnju primljen.', { zahtjevId: ui.pendingRequest.id })
   }
-  persist()
+  commitDriverUi(accountId)
 
   await appendNotification({
     accountId,
@@ -590,7 +594,7 @@ export async function driverCancelActiveRide(
   ui.availabilityStatus = 'dostupan'
   if (ui.vehicleUi.status !== 'van_funkcije') ui.vehicleUi.status = 'dostupno'
   pushLog(accountId, 'vožnja', `Vožnja otkazana: ${reason}`, { vožnjaId: ride.id })
-  persist()
+  commitDriverUi(accountId)
   const db = getDb()
   const dp = db.driverProfiles.find((p) => p.accountId === accountId)
   if (dp) {
@@ -673,7 +677,7 @@ export async function driverReportProblem(
     }
     pushLog(accountId, 'problem', `Problem poslan dispečeru (${label}): ${description}`)
   }
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -685,7 +689,7 @@ export async function driverSimulateNewRequest(accountId: string): Promise<{ ok:
   }
   ui.pendingRequest = buildTemplateRideRequest()
   pushLog(accountId, 'zahtjev', 'Novi zahtjev za vožnju primljen.', { zahtjevId: ui.pendingRequest.id })
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -693,7 +697,7 @@ export async function driverSetGpsUnavailableDemo(accountId: string, value: bool
   await delay(120)
   const ui = uiFor(accountId)
   ui.flags.gpsUnavailableSim = value
-  persist()
+  commitDriverUi(accountId)
 }
 
 export async function driverSetSuspendedDemo(accountId: string, value: boolean): Promise<void> {
@@ -704,7 +708,7 @@ export async function driverSetSuspendedDemo(accountId: string, value: boolean):
     ui.availabilityStatus = 'van_funkcije'
     ui.pendingRequest = null
   }
-  persist()
+  commitDriverUi(accountId)
 }
 
 export async function driverSetLicenseExpiredDemo(accountId: string, value: boolean): Promise<void> {
@@ -714,14 +718,14 @@ export async function driverSetLicenseExpiredDemo(accountId: string, value: bool
   const db = getDb()
   const prof = db.driverProfiles.find((p) => p.accountId === accountId)
   if (prof) prof.licenseStatus = value ? 'istekla' : 'validna'
-  persist()
+  commitDriverUi(accountId)
 }
 
 export async function driverSetDebtDemo(accountId: string, value: boolean): Promise<void> {
   await delay(120)
   const ui = uiFor(accountId)
   ui.flags.debtOwed = value
-  persist()
+  commitDriverUi(accountId)
 }
 
 export async function driverUpdateSettings(
@@ -746,7 +750,7 @@ export async function driverUpdateSettings(
   if (patch.shareLocationWithDispatcher !== undefined) ui.settings.shareLocationWithDispatcher = patch.shareLocationWithDispatcher
   if (patch.lastGpsReadAt !== undefined) ui.settings.lastGpsReadAt = patch.lastGpsReadAt
   if (patch.lastKnownLocationLabel !== undefined) ui.settings.lastKnownLocationLabel = patch.lastKnownLocationLabel
-  persist()
+  commitDriverUi(accountId)
 }
 
 /** Potvrđeno gašenje GPS-a tokom aktivne smjene (bez aktivne vožnje). */
@@ -771,7 +775,7 @@ export async function driverConfirmGpsOffDuringShift(accountId: string): Promise
   ui.pendingRequest = null
   if (ui.vehicleUi.status !== 'van_funkcije') ui.vehicleUi.status = 'dostupno'
   pushLog(accountId, 'gps', 'GPS isključen tokom smjene. Smjena prekinuta; vozač van smjene.')
-  persist()
+  commitDriverUi(accountId)
   return { ok: true }
 }
 
@@ -786,7 +790,7 @@ export async function resetDriverDemo(accountId: string): Promise<void> {
     prof.licenseStatus = 'validna'
   }
   db.driverAvatarPendingRequests = db.driverAvatarPendingRequests.filter((r) => r.driverAccountId !== accountId)
-  persist()
+  commitDriverUi(accountId)
 }
 
 export function driverAvailabilityLabel(s: DriverAvailability): string {

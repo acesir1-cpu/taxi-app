@@ -1,4 +1,5 @@
 import { createFreshSeed, ensureDispatchData, ensureDriverData } from '../data/seed'
+import { syncAllLinkedFleetDriversFromUi } from './driverFleetSync'
 import type { DriverAvailability, MockDatabase, RideRequestStatus, RideStatus, VehicleStatus } from '../types/domain'
 import { loadRaw, saveRaw } from '../utils/storage'
 
@@ -60,6 +61,7 @@ function normalizeDb(db: MockDatabase): boolean {
   let changed = false
   if (ensureDriverData(db)) changed = true
   if (ensureDispatchData(db)) changed = true
+  if (syncAllLinkedFleetDriversFromUi()) changed = true
   for (const u of db.users) {
     const r = u as { role?: string }
     if (r.role !== 'putnik' && r.role !== 'vozac' && r.role !== 'dispecer') {

@@ -23,6 +23,7 @@ import { calculateRoute } from './locationApi'
 import { getDb, persist } from './mockDb'
 import { complaintStatusLabel } from '../lib/passengerStatusLabels'
 import { appendNotification } from './notificationApi'
+import { syncAllLinkedFleetDriversFromUi, syncFleetDriverToLinkedUi } from './driverFleetSync'
 
 export const DISPATCH_UPDATED_EVENT = 'urbanflow:dispatch-updated'
 
@@ -393,6 +394,7 @@ function buildAnomalies(rows: DispatchRideRow[], drivers: DispatchDriverRow[], c
 
 export async function getDispatchSnapshot(dispatcherAccountId: string): Promise<DispatchSnapshot> {
   await delay(16)
+  if (syncAllLinkedFleetDriversFromUi()) persist()
   const dispatcher = profileFor(dispatcherAccountId)
   if (!dispatcher) throw new Error('not_dispatcher')
   const db = getDb()
@@ -576,6 +578,24 @@ export async function assignRideToDriver(
   }
   request.status = 'dodijeljen'
   driver.availabilityStatus = 'zauzet'
+  vehicle.status = 'nedostupno'
+  if (previousDriverId && previousDriverId !== driver.id) {
+    const prev = db.drivers.find((d) => d.id === previousDriverId)
+    if (prev) {
+      const prevVehicle = db.vehicles.find((v) => v.id === prev.vehicleId)
+      const prevActive = db.rides.some(
+        (r) =>
+          r.driverId === previousDriverId &&
+          ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku', 'problematicna'].includes(r.status),
+      )
+      if (!prevActive) {
+        prev.availabilityStatus = 'dostupan'
+        if (prevVehicle && prevVehicle.status !== 'dostupno') prevVehicle.status = 'dostupno'
+      }
+    }
+    syncFleetDriverToLinkedUi(previousDriverId)
+  }
+  syncFleetDriverToLinkedUi(driver.id)
   pushDispatchLog({
     dispatcherAccountId,
     kind: 'ride',
@@ -617,10 +637,13 @@ export async function forceDriverStatus(
   const driver = db.drivers.find((d) => d.id === driverId)
   if (!driver) return { error: 'not_found' }
   driver.availabilityStatus = status
-  const linked = db.driverProfiles.find((p) => p.linkedDriverId === driver.id)
-  if (linked && db.driverUiByAccountId[linked.accountId]) {
-    db.driverUiByAccountId[linked.accountId].availabilityStatus = status
+  const linkedVehicle = db.vehicles.find((v) => v.id === driver.vehicleId)
+  if (linkedVehicle) {
+    if (status === 'van_funkcije' || status === 'zauzet') linkedVehicle.status = 'nedostupno'
+    else if (status === 'dostupan') linkedVehicle.status = 'dostupno'
+    else if (status === 'van_smjene' || status === 'na_pauzi') linkedVehicle.status = 'u_servisu'
   }
+  syncFleetDriverToLinkedUi(driver.id)
   pushDispatchLog({
     dispatcherAccountId,
     kind: 'driver',
