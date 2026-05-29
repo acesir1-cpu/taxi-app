@@ -184,7 +184,7 @@ export const bs = {
     resetPasswordPlaceholder: 'Vaša e-mail adresa',
     resetPasswordSend: 'Pošalji link za resetovanje',
     resetPasswordEmailRequired: 'Unesite e-mail adresu.',
-    resetPasswordSent: 'Link za resetovanje je poslan (demo).',
+    resetPasswordSent: 'Link za resetovanje je poslan.',
     backToLogin: 'Nazad na prijavu',
     acceptTermsPrefix: 'Prihvatam',
     termsLink: 'Uslove korištenja',
@@ -1188,6 +1188,12 @@ export const bs = {
     p1: 'Korištenjem aplikacije UrbanFlow Taxi prihvatate ove uslove. Usluga je trenutno u demonstracijskom režimu (simulacija).',
     p2: 'Putnik se obavezuje da će tačno navesti polazište i odredište, poštovati vozača i vozilo te platiti dogovorenu naknadu prema važećem cjenovniku.',
     p3: 'UrbanFlow zadržava pravo izmjene funkcionalnosti u MVP fazi. Za pitanja koristite stranicu Podrška.',
+  },
+  notFoundPage: {
+    code: '404',
+    title: 'Stranica nije pronađena',
+    message: 'Tražena adresa ne postoji ili nemate pristup ovoj stranici.',
+    home: 'Na početnu',
   },
   supportPage: {
     title: 'Podrška',

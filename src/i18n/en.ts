@@ -184,7 +184,7 @@ export const en = {
     resetPasswordPlaceholder: 'Your email address',
     resetPasswordSend: 'Send reset link',
     resetPasswordEmailRequired: 'Please enter your email address.',
-    resetPasswordSent: 'Password reset link sent (demo).',
+    resetPasswordSent: 'Password reset link sent.',
     backToLogin: 'Back to login',
     acceptTermsPrefix: 'I agree to the',
     termsLink: 'Terms of Service',
@@ -1184,6 +1184,12 @@ export const en = {
     p1: 'By using the UrbanFlow Taxi app you accept these terms. The service is currently in demo mode (simulation).',
     p2: 'You agree to provide accurate pickup and drop-off details, respect drivers and vehicles, and pay the agreed fare according to the applicable price list.',
     p3: 'UrbanFlow may change functionality during the MVP phase. For questions, use the Support page.',
+  },
+  notFoundPage: {
+    code: '404',
+    title: 'Page not found',
+    message: 'This address does not exist or you do not have access to this page.',
+    home: 'Go to home',
   },
   supportPage: {
     title: 'Support',

@@ -42,6 +42,7 @@ import { DispatcherRidesPage } from './pages/DispatcherRidesPage'
 import { DispatcherSettingsPage } from './pages/DispatcherSettingsPage'
 import { DesignConsistencyPage } from './pages/DesignConsistencyPage'
 import { FutureRoleDemoPage } from './pages/FutureRoleDemoPage'
+import { NotFoundPage } from './pages/NotFoundPage'
 
 function RootRedirect() {
   const { data, isLoading } = useMe()
@@ -82,7 +83,7 @@ function PassengerProtectedLayout() {
       </div>
     )
   }
-  if (!data) return <Navigate to="/welcome" replace />
+  if (!data) return <NotFoundPage />
   if (data.kind === 'driver') return <Navigate to="/driver" replace />
   if (data.kind === 'dispatcher') return <Navigate to="/dispatch" replace />
   return <Outlet />
@@ -97,7 +98,7 @@ function DriverProtectedLayout() {
       </div>
     )
   }
-  if (!data) return <Navigate to="/welcome" replace />
+  if (!data) return <NotFoundPage />
   if (data.kind === 'passenger') return <Navigate to="/app/order" replace />
   if (data.kind === 'dispatcher') return <Navigate to="/dispatch" replace />
   return <Outlet />
@@ -112,7 +113,7 @@ function DispatcherProtectedLayout() {
       </div>
     )
   }
-  if (!data) return <Navigate to="/welcome" replace />
+  if (!data) return <NotFoundPage />
   if (data.kind !== 'dispatcher') {
     if (data.kind === 'driver') return <Navigate to="/driver" replace />
     return <Navigate to="/app/order" replace />
@@ -181,7 +182,7 @@ export default function App() {
           <Route path="settings" element={<DispatcherSettingsPage />} />
         </Route>
       </Route>
-      <Route path="*" element={<Navigate to="/welcome" replace />} />
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   )
 }
