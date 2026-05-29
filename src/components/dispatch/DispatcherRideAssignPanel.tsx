@@ -9,7 +9,11 @@ import { dispatchToastMessage } from '../../lib/dispatchToast'
 import { AiEstimatePanel } from '../common/AiEstimatePanel'
 import { DispatchDriverSuggestList } from './DispatchDriverSuggestList'
 import { useAiRouteEstimate } from '../../hooks/useAiRouteEstimate'
-import { assignRideToDriver, suggestDriversForRequest } from '../../services/dispatcherApi'
+import {
+  assignRideToDriver,
+  isDispatchRideAwaitingAssignment,
+  suggestDriversForRequest,
+} from '../../services/dispatcherApi'
 import type { DispatchRideRow } from '../../services/dispatcherApi'
 import { useToastStore } from '../../store/notificationStore'
 
@@ -35,7 +39,7 @@ export function DispatcherRideAssignPanel({
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
 
-  const awaitingAssignment = Boolean(selectedRow && !selectedRow.ride)
+  const awaitingAssignment = Boolean(selectedRow && isDispatchRideAwaitingAssignment(selectedRow))
   const requestId = awaitingAssignment ? selectedRow!.request.id : ''
 
   const suggestionsQ = useQuery({
@@ -86,7 +90,7 @@ export function DispatcherRideAssignPanel({
 
   const detailPath = `/dispatch/rides/${selectedRow.ride?.id ?? selectedRow.request.id}`
 
-  if (selectedRow.ride) {
+  if (selectedRow.ride?.driverId) {
     return (
       <Card className={passengerAppCardClassName}>
         <CardHeader className="pb-2">

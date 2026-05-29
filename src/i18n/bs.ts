@@ -749,6 +749,7 @@ export const bs = {
       profileSaved: 'Profil je ažuriran.',
       driver_unavailable: 'Vozač trenutno nije dostupan.',
       vehicle_unavailable: 'Vozilo vozača nije dostupno.',
+      already_assigned: 'Vožnja već ima dodijeljenog vozača.',
     },
     dashboard: {
       kpiActiveRides: 'Aktivne vožnje',

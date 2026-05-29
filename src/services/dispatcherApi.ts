@@ -172,6 +172,22 @@ export function dispatchDriverStatusLabel(status: DriverAvailability): string {
   return labels[status]
 }
 
+const AWAITING_ASSIGNMENT_REQUEST_STATUSES: RideRequest['status'][] = ['kreiran', 'u_obradi']
+
+const REASSIGNABLE_RIDE_STATUSES: RideStatus[] = ['dodijeljena', 'vozac_na_putu', 'stigao', 'problematicna']
+
+export function isDispatchRideAwaitingAssignment(
+  row: Pick<DispatchRideRow, 'ride' | 'request'>
+): boolean {
+  if (row.ride) return false
+  return AWAITING_ASSIGNMENT_REQUEST_STATUSES.includes(row.request.status)
+}
+
+export function canReassignDispatchRide(ride: Ride | null | undefined): boolean {
+  if (!ride) return false
+  return REASSIGNABLE_RIDE_STATUSES.includes(ride.status)
+}
+
 export function dispatchRideStatusLabel(status: RideStatus | RideRequest['status']): string {
   const labels: Record<RideStatus | RideRequest['status'], string> = {
     kreiran: 'Kreiran',
@@ -505,7 +521,8 @@ export async function suggestDriversForRequest(requestId: string): Promise<Dispa
 export async function assignRideToDriver(
   dispatcherAccountId: string,
   requestId: string,
-  driverId: string
+  driverId: string,
+  options?: { allowReassign?: boolean }
 ): Promise<{ ok: true; ride: Ride } | { error: string }> {
   await delay(180)
   const db = getDb()
@@ -520,6 +537,7 @@ export async function assignRideToDriver(
   if ('error' in route) return { error: route.error }
 
   let ride = request.rideId ? db.rides.find((r) => r.id === request.rideId) : undefined
+  if (ride?.driverId && !options?.allowReassign) return { error: 'already_assigned' }
   const previousDriverId = ride?.driverId
   const isReassign = Boolean(ride && previousDriverId && previousDriverId !== driver.id)
   if (ride) {
@@ -584,7 +602,7 @@ export async function reassignRide(
   const db = getDb()
   const ride = db.rides.find((r) => r.id === rideId)
   if (!ride) return { error: 'not_found' }
-  return assignRideToDriver(dispatcherAccountId, ride.requestId, driverId)
+  return assignRideToDriver(dispatcherAccountId, ride.requestId, driverId, { allowReassign: true })
 }
 
 export async function forceDriverStatus(

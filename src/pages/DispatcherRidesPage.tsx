@@ -16,7 +16,7 @@ import { useLangRefresh } from '../hooks/useLangRefresh'
 import { strings } from '../i18n/strings'
 import { dispatchToastMessage } from '../lib/dispatchToast'
 import { cn } from '../lib/utils'
-import { createManualRideRequest, getDispatchLocations } from '../services/dispatcherApi'
+import { createManualRideRequest, getDispatchLocations, isDispatchRideAwaitingAssignment } from '../services/dispatcherApi'
 import { useToastStore } from '../store/notificationStore'
 import { useDispatcherSession } from '../hooks/useDispatcherSession'
 import type { Location, OrderType } from '../types/domain'
@@ -24,10 +24,6 @@ import type { Location, OrderType } from '../types/domain'
 type RideFilter = 'sve' | 'aktivne' | 'cekaju' | 'problem' | 'zavrsene'
 
 const RIDE_FILTERS = new Set<RideFilter>(['sve', 'aktivne', 'cekaju', 'problem', 'zavrsene'])
-
-function isAwaitingAssignment(row: { ride: unknown; request: { status: string } }): boolean {
-  return !row.ride && ['kreiran', 'u_obradi'].includes(row.request.status)
-}
 
 export function DispatcherRidesPage() {
   useLangRefresh()
@@ -75,7 +71,7 @@ export function DispatcherRidesPage() {
   ]
 
   const waitingCount = useMemo(
-    () => (data?.rides.filter(isAwaitingAssignment).length ?? 0),
+    () => (data?.rides.filter(isDispatchRideAwaitingAssignment).length ?? 0),
     [data],
   )
 
@@ -123,7 +119,7 @@ export function DispatcherRidesPage() {
         row.driverName?.toLowerCase().includes(q)
       if (!matchesQuery) return false
       if (filter === 'aktivne') return row.ride && ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(row.ride.status)
-      if (filter === 'cekaju') return isAwaitingAssignment(row)
+      if (filter === 'cekaju') return isDispatchRideAwaitingAssignment(row)
       if (filter === 'problem') return ['problematicna', 'neuspjesna', 'neuspjesan', 'otkazana', 'otkazan'].includes(row.status)
       if (filter === 'zavrsene') return row.status === 'zavrsena'
       return true
@@ -139,7 +135,7 @@ export function DispatcherRidesPage() {
 
   useEffect(() => {
     if (!data || filter !== 'cekaju') return
-    const first = data.rides.find(isAwaitingAssignment)
+    const first = data.rides.find(isDispatchRideAwaitingAssignment)
     if (first) setSelectedRequestId(first.request.id)
   }, [filter, data])
 
@@ -229,7 +225,7 @@ export function DispatcherRidesPage() {
                   <p className="px-4 py-8 text-center text-sm text-slate-500">{t.dispatcher.dashboard.noRidesForFilter}</p>
                 ) : (
                   rows.map((row) => {
-                    const awaiting = isAwaitingAssignment(row)
+                    const awaiting = isDispatchRideAwaitingAssignment(row)
                     const selected = selectedRequestId === row.request.id
                     return (
                       <div

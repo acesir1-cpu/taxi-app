@@ -745,6 +745,7 @@ export const en = {
       profileSaved: 'Profile updated.',
       driver_unavailable: 'Driver is not available right now.',
       vehicle_unavailable: 'Driver vehicle is not available.',
+      already_assigned: 'This ride already has an assigned driver.',
     },
     dashboard: {
       kpiActiveRides: 'Active rides',

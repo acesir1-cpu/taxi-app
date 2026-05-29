@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Ban, Car, MessageSquare, RefreshCw, Route, User, Wallet } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AiEstimatePanel } from '../components/common/AiEstimatePanel'
@@ -20,8 +20,10 @@ import { dispatchToastMessage } from '../lib/dispatchToast'
 import {
   appendDispatchLog,
   assignRideToDriver,
+  canReassignDispatchRide,
   cancelRideByDispatcher,
   dispatcherCan,
+  isDispatchRideAwaitingAssignment,
   markRideProblematic,
   reassignRide,
   suggestDriversForRequest,
@@ -41,8 +43,13 @@ export function DispatcherRideDetailPage() {
   const push = useToastStore((s) => s.push)
   const [reason, setReason] = useState<string>(d.defaultCancelReason)
   const [note, setNote] = useState('')
+  const [reassignOpen, setReassignOpen] = useState(false)
   const { data, isPending } = useDispatchData()
   const row = useMemo(() => data?.rides.find((item) => item.id === id || item.request.id === id || item.ride?.id === id) ?? null, [data, id])
+
+  useEffect(() => {
+    setReassignOpen(false)
+  }, [id])
 
   const aiQ = useAiRouteEstimate(row?.request.pickup, row?.request.destination, {
     availableDrivers: data?.kpis.availableDrivers ?? 0,
@@ -52,10 +59,14 @@ export function DispatcherRideDetailPage() {
   const aiEstimate = aiQ.data && !('error' in aiQ.data) ? aiQ.data : null
   const aiError = aiQ.data && 'error' in aiQ.data ? aiQ.data.error : null
 
+  const awaitingAssignment = row ? isDispatchRideAwaitingAssignment(row) : false
+  const assignedWithDriver = Boolean(row?.ride?.driverId)
+  const showAssignList = awaitingAssignment || (assignedWithDriver && reassignOpen && canReassignDispatchRide(row?.ride))
+
   const suggestionsQ = useQuery({
     queryKey: ['dispatchDriverSuggestions', row?.request.id],
     queryFn: () => suggestDriversForRequest(row!.request.id),
-    enabled: Boolean(row?.request.id),
+    enabled: Boolean(row?.request.id && showAssignList),
   })
 
   const refresh = async () => {
@@ -72,6 +83,7 @@ export function DispatcherRideDetailPage() {
         return
       }
       push(row?.ride ? toast.rideReassigned : toast.rideAssignedShort, 'success')
+      setReassignOpen(false)
       await refresh()
     },
   })
@@ -191,18 +203,43 @@ export function DispatcherRideDetailPage() {
               {d.assignTitle}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <DispatchDriverSuggestList
-              drivers={suggestionsQ.data}
-              pickup={row.request.pickup}
-              availableDrivers={data?.kpis.availableDrivers ?? 0}
-              aiEstimate={aiEstimate}
-              isLoading={suggestionsQ.isLoading}
-              assignPending={assignMut.isPending}
-              onAssign={(driverId) => assignMut.mutate(driverId)}
-              assignLabel={row.ride ? d.reassign : c.assign}
-              emptyMessage={d.noFreeDrivers}
-            />
+          <CardContent className="space-y-3">
+            {assignedWithDriver && !showAssignList ? (
+              <>
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/80 p-4">
+                  <p className="font-bold text-brand-navy">{t.dispatcher.rides.assignPanelAssigned}</p>
+                  <p className="mt-1 text-sm text-slate-600">{t.dispatcher.rides.assignPanelAssignedHint}</p>
+                  <p className="mt-3 text-sm font-semibold text-brand-navy">
+                    {row.driverName} · {row.vehicleLabel}
+                  </p>
+                </div>
+                {canReassignDispatchRide(row.ride) ? (
+                  <Button type="button" variant="outlineThin" className="w-full" onClick={() => setReassignOpen(true)}>
+                    <RefreshCw className="h-4 w-4" />
+                    {d.reassign}
+                  </Button>
+                ) : null}
+              </>
+            ) : (
+              <>
+                {assignedWithDriver && reassignOpen ? (
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setReassignOpen(false)}>
+                    {t.dispatcher.rides.changeSelection}
+                  </Button>
+                ) : null}
+                <DispatchDriverSuggestList
+                  drivers={suggestionsQ.data}
+                  pickup={row.request.pickup}
+                  availableDrivers={data?.kpis.availableDrivers ?? 0}
+                  aiEstimate={aiEstimate}
+                  isLoading={suggestionsQ.isLoading}
+                  assignPending={assignMut.isPending}
+                  onAssign={(driverId) => assignMut.mutate(driverId)}
+                  assignLabel={row.ride ? d.reassign : c.assign}
+                  emptyMessage={d.noFreeDrivers}
+                />
+              </>
+            )}
           </CardContent>
         </Card>
 

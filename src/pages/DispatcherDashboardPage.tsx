@@ -16,7 +16,7 @@ import { useLangRefresh } from '../hooks/useLangRefresh'
 import { strings } from '../i18n/strings'
 import { cn } from '../lib/utils'
 import { dispatchAnomalyLink } from '../lib/dispatchAnomalyLink'
-import { acknowledgeAnomaly } from '../services/dispatcherApi'
+import { acknowledgeAnomaly, isDispatchRideAwaitingAssignment } from '../services/dispatcherApi'
 import { useDispatcherSession } from '../hooks/useDispatcherSession'
 
 type DashboardFilter = 'sve' | 'problematicne' | 'bez_voznje' | 'dostupan' | 'zauzet' | 'van_funkcije'
@@ -57,7 +57,7 @@ export function DispatcherDashboardPage() {
   }, [data, filter])
 
   const waitingCount = useMemo(
-    () => (data?.rides.filter((row) => !row.ride && ['kreiran', 'u_obradi'].includes(row.request.status)).length ?? 0),
+    () => (data?.rides.filter(isDispatchRideAwaitingAssignment).length ?? 0),
     [data],
   )
 
