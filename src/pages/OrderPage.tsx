@@ -891,7 +891,7 @@ export function OrderPage() {
     requestPassengerGps('map-center')
   }, [pickup, destination, requestPassengerGps])
 
-  const mobileSheetMapRelayoutTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null)
+  const mobileSheetMapRelayoutTimerRef = useRef<number | null>(null)
   const mobileViewportHeightPrevRef = useRef<number | null>(null)
 
   useEffect(
