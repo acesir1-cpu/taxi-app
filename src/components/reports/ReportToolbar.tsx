@@ -1,4 +1,5 @@
 import { Download, Printer } from 'lucide-react'
+import { cn } from '../../lib/utils'
 import type { ReportDocument } from '../../types/reports'
 import { getReportBuildLabels } from '../../lib/reports/reportLabels'
 import { downloadCsv, openPrintableReport } from '../../lib/reports/reportRender'
@@ -8,6 +9,7 @@ export function ReportToolbar({
   document,
   labels,
   hasRows,
+  className,
 }: {
   document: ReportDocument
   labels: {
@@ -18,13 +20,15 @@ export function ReportToolbar({
     page: string
   }
   hasRows: boolean
+  className?: string
 }) {
   return (
-    <div className="flex flex-wrap gap-2 print:hidden">
+    <div className={cn('flex flex-wrap gap-2 print:hidden', className)}>
       <Button
         type="button"
         variant="secondary"
         size="sm"
+        className="min-h-10 flex-1 sm:flex-none"
         disabled={!hasRows}
         onClick={() => {
           const L = getReportBuildLabels()
@@ -39,7 +43,14 @@ export function ReportToolbar({
         <Printer className="mr-1.5 h-4 w-4" />
         {labels.printPdf}
       </Button>
-      <Button type="button" variant="secondary" size="sm" disabled={!hasRows} onClick={() => downloadCsv(document)}>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="min-h-10 flex-1 sm:flex-none"
+        disabled={!hasRows}
+        onClick={() => downloadCsv(document)}
+      >
         <Download className="mr-1.5 h-4 w-4" />
         {labels.exportCsv}
       </Button>

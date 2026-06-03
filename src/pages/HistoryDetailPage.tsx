@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import { LoadingState } from '../components/common/LoadingState'
 import { PassengerInvoiceLink } from '../components/passenger/PassengerInvoiceLink'
+import { PassengerRideConfirmationLink } from '../components/passenger/PassengerRideConfirmationLink'
 
 export function HistoryDetailPage() {
   const t = strings()
@@ -147,13 +148,11 @@ export function HistoryDetailPage() {
               {t.history.complaintStatuses[complaint.status as ComplaintStatus]}
             </p>
           ) : null}
-          <div className="flex flex-wrap gap-2 pt-2">
+          <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap">
             {rideDetail.status === 'zavrsena' ? (
-              <PassengerInvoiceLink rideId={rideDetail.id} />
+              <PassengerInvoiceLink rideId={rideDetail.id} className="w-full sm:w-auto" />
             ) : (
-              <Button variant="outline" asChild>
-                <Link to={`/app/documents/ride_confirmation/${rideDetail.id}`}>{t.history.viewRideConfirmation}</Link>
-              </Button>
+              <PassengerRideConfirmationLink rideId={rideDetail.id} className="w-full sm:w-auto" />
             )}
             <Button type="button" onClick={onRepeat}>
               {t.history.repeat}

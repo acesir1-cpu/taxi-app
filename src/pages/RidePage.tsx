@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { cn } from '../lib/utils'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
@@ -30,6 +30,7 @@ import { Button } from '../components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Label } from '../components/ui/label'
+import { PassengerRideConfirmationLink } from '../components/passenger/PassengerRideConfirmationLink'
 
 function useIsMobileRideLayout() {
   const [mobile, setMobile] = useState(
@@ -432,9 +433,11 @@ export function RidePage() {
         {t.ride.problem}
       </Button>
       {['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(ride.status) ? (
-        <Button variant="outline" className="flex-1" size="lg" asChild>
-          <Link to={`/app/documents/ride_confirmation/${ride.id}`}>{t.history.viewRideConfirmation}</Link>
-        </Button>
+        <PassengerRideConfirmationLink
+          rideId={ride.id}
+          size="lg"
+          className="ride-confirmation-btn w-full flex-1"
+        />
       ) : null}
     </div>
   )

@@ -68,8 +68,8 @@ export function PassengerDocumentPage() {
   const hasRows = result.sections.some((s) => s.groups.some((g) => g.rows.length > 0))
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <Button variant="secondary" size="sm" asChild>
+    <div className="passenger-document-page mx-auto max-w-3xl space-y-4 pb-2">
+      <Button variant="secondary" size="sm" className="w-full sm:w-auto" asChild>
         <Link
           to={
             type === 'booking_confirmation'

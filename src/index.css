@@ -1657,6 +1657,12 @@
     font-weight: 700;
   }
 
+  .ride-mobile-action-dock .ride-confirmation-btn {
+    order: 4;
+    width: 100%;
+    font-weight: 600;
+  }
+
   .ride-mobile-action-dock .ride-problem-btn {
     order: 3;
     background: rgb(255 255 255 / 0.12) !important;

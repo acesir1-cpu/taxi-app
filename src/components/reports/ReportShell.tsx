@@ -36,15 +36,15 @@ export function ReportShell({
       : null
 
   return (
-    <article className="report-document space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:shadow-none md:p-6">
+    <article className="report-document space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm max-md:rounded-2xl print:border-0 print:shadow-none sm:p-5 md:p-6">
       <header className="border-b border-slate-100 pb-4 print:border-slate-300">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <AppLogo className="h-9 w-auto print:h-8" />
-            <div>
-              <h1 className="text-xl font-extrabold text-brand-navy md:text-2xl">{document.meta.title}</h1>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <AppLogo className="h-9 w-auto shrink-0 print:h-8" />
+            <div className="min-w-0">
+              <h1 className="text-lg font-extrabold text-brand-navy sm:text-xl md:text-2xl">{document.meta.title}</h1>
               {document.meta.subtitle ? (
-                <p className="mt-0.5 text-sm text-slate-600">{document.meta.subtitle}</p>
+                <p className="mt-0.5 truncate text-sm text-slate-600">{document.meta.subtitle}</p>
               ) : null}
             </div>
           </div>
@@ -52,6 +52,7 @@ export function ReportShell({
             document={document}
             labels={toolbarLabels}
             hasRows={hasRows}
+            className="w-full sm:w-auto"
           />
         </div>
         <dl className="mt-3 grid gap-1 text-xs text-slate-600 sm:grid-cols-2">

@@ -11,6 +11,7 @@ import { deleteRideFromHistory, getRatingForRide, getRideHistory, purgePassenger
 import { clearHistoryInApp, getHistoryPrivacyPrefs } from '../lib/historyPrivacy'
 import { RideStatusBadge } from '../components/common/StatusBadge'
 import { PassengerInvoiceLink } from '../components/passenger/PassengerInvoiceLink'
+import { PassengerRideConfirmationLink } from '../components/passenger/PassengerRideConfirmationLink'
 import { EmptyState } from '../components/common/EmptyState'
 import { Card, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button'
@@ -615,7 +616,14 @@ function RideHistoryCard({
               className="h-7 shrink-0 px-2.5 text-xs"
               label={t.history.viewInvoice}
             />
-          ) : null}
+          ) : (
+            <PassengerRideConfirmationLink
+              rideId={ride.id}
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0 px-2.5 text-xs"
+            />
+          )}
           {ride.status === 'zavrsena' && !rated ? (
             <button
               type="button"
