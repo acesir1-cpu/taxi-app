@@ -169,6 +169,21 @@ export async function getRideHistory(passengerProfileId: string): Promise<Ride[]
 
 const PASSENGER_HISTORY_STATUSES: RideStatus[] = ['zavrsena', 'otkazana', 'neuspjesna']
 
+const ACTIVE_SCHEDULED_REQUEST_STATUSES: RideRequest['status'][] = ['kreiran', 'u_obradi', 'dodijeljen']
+
+function isActiveScheduledRequest(request: RideRequest): boolean {
+  return request.orderType === 'zakazano' && ACTIVE_SCHEDULED_REQUEST_STATUSES.includes(request.status)
+}
+
+function dismissScheduledRequest(db: ReturnType<typeof getDb>, requestId: string): void {
+  if (!db.passengerDismissedScheduledRequestIds) {
+    db.passengerDismissedScheduledRequestIds = []
+  }
+  if (!db.passengerDismissedScheduledRequestIds.includes(requestId)) {
+    db.passengerDismissedScheduledRequestIds.push(requestId)
+  }
+}
+
 function passengerHasHistoryRides(db: ReturnType<typeof getDb>, passengerProfileId: string): boolean {
   return db.rides.some(
     (r) => r.passengerId === passengerProfileId && PASSENGER_HISTORY_STATUSES.includes(r.status)
@@ -185,7 +200,9 @@ export async function purgePassengerHistory(
     db.rides.filter((r) => r.passengerId === passengerProfileId).map((r) => r.id)
   )
   db.rides = db.rides.filter((r) => r.passengerId !== passengerProfileId)
-  db.rideRequests = db.rideRequests.filter((r) => r.passengerId !== passengerProfileId)
+  db.rideRequests = db.rideRequests.filter(
+    (r) => r.passengerId !== passengerProfileId || isActiveScheduledRequest(r)
+  )
   db.passengerDemoHistoryCleared = true
   db.ratings = db.ratings.filter((r) => r.passengerId !== passengerProfileId)
   db.complaints = db.complaints.filter(
@@ -231,7 +248,9 @@ export async function deleteRideFromHistory(
   if (!ride) return { error: 'not_found' }
   if (ride.passengerId !== passengerProfileId) return { error: 'forbidden' }
   db.rides = db.rides.filter((r) => r.id !== rideId)
-  db.rideRequests = db.rideRequests.filter((r) => r.id !== ride.requestId)
+  if (ride.requestId) {
+    db.rideRequests = db.rideRequests.filter((r) => r.id !== ride.requestId)
+  }
   db.ratings = db.ratings.filter((r) => r.rideId !== rideId)
   db.complaints = db.complaints.filter((c) => c.rideId !== rideId)
   if (!passengerHasHistoryRides(db, passengerProfileId)) {
@@ -586,13 +605,28 @@ async function assignDriverUnlocked(
 export async function cancelRideRequest(
   requestId: string,
   accountId: string
-): Promise<{ ok: true } | { error: 'not_found' }> {
+): Promise<{ ok: true } | { error: 'not_found' | 'forbidden' }> {
   await delay(120)
   const db = getDb()
   const request = db.rideRequests.find((r) => r.id === requestId)
   if (!request) return { error: 'not_found' }
+  const profile = db.profiles.find((p) => p.accountId === accountId)
+  if (!profile || request.passengerId !== profile.id) return { error: 'forbidden' }
   const wasScheduled = request.orderType === 'zakazano'
   request.status = 'otkazan'
+  if (wasScheduled) {
+    dismissScheduledRequest(db, requestId)
+  }
+  const linkedRide = db.rides.find((r) => r.requestId === requestId)
+  if (linkedRide && isRideActive(linkedRide.status)) {
+    linkedRide.status = 'otkazana'
+    linkedRide.cancelledAt = new Date().toISOString()
+    linkedRide.cancellationReason = linkedRide.cancellationReason ?? 'Otkazano'
+    const driver = db.drivers.find((d) => d.id === linkedRide.driverId)
+    if (driver?.availabilityStatus === 'zauzet') {
+      driver.availabilityStatus = 'dostupan'
+    }
+  }
   db.activityLogs.unshift({
     id: uid('log'),
     accountId,

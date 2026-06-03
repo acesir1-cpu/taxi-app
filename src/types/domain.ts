@@ -463,6 +463,8 @@ export interface MockDatabase {
   rideRequests: RideRequest[]
   rides: Ride[]
   passengerDemoHistoryCleared?: boolean
+  /** Zakazani zahtjevi koje je putnik otkazao — seed ih ne vraća. */
+  passengerDismissedScheduledRequestIds?: string[]
   ratings: Rating[]
   complaints: Complaint[]
   activityLogs: ActivityLog[]

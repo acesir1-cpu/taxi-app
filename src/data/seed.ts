@@ -1170,7 +1170,13 @@ export function ensureDriverData(db: MockDatabase): boolean {
     changed = true
   }
   if (!db.passengerDemoHistoryCleared) {
+    if (!Array.isArray(db.passengerDismissedScheduledRequestIds)) {
+      db.passengerDismissedScheduledRequestIds = []
+      changed = true
+    }
+    const dismissed = new Set(db.passengerDismissedScheduledRequestIds)
     for (const req of demoScheduledRequests) {
+      if (dismissed.has(req.id)) continue
       if (!db.rideRequests.some((r) => r.id === req.id)) {
         db.rideRequests.push(structuredClone(req))
         changed = true
@@ -1332,6 +1338,7 @@ export function createFreshSeed(): MockDatabase {
     ],
     rides: [...structuredClone(demoPassengerRides), structuredClone(dispatchActiveRide), structuredClone(dispatchAssignedRide)],
     passengerDemoHistoryCleared: false,
+    passengerDismissedScheduledRequestIds: [],
     ratings,
     complaints,
     activityLogs: [],

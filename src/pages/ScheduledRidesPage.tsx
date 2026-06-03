@@ -35,12 +35,31 @@ export function ScheduledRidesPage() {
 
   const cancelMut = useMutation({
     mutationFn: (requestId: string) => cancelRideRequest(requestId, me.account.id),
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ['scheduledRequests', me.profile.id] })
-      push(t.notifications.rideCancelled, 'success')
-      push(t.order.scheduledManageDesc, 'info')
+    onMutate: async (requestId) => {
+      await qc.cancelQueries({ queryKey: ['scheduledRequests', me.profile.id] })
+      const previous = qc.getQueryData<RideRequest[]>(['scheduledRequests', me.profile.id])
+      if (previous) {
+        qc.setQueryData<RideRequest[]>(
+          ['scheduledRequests', me.profile.id],
+          previous.filter((r) => r.id !== requestId)
+        )
+      }
+      return { previous }
     },
-    onError: () => {
+    onSuccess: (res) => {
+      if (res && 'error' in res) {
+        push(t.common.error, 'error')
+        return
+      }
+      push(t.notifications.rideCancelled, 'success')
+    },
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: ['scheduledRequests', me.profile.id] })
+    },
+    onError: (_err, _requestId, context) => {
+      if (context?.previous) {
+        qc.setQueryData(['scheduledRequests', me.profile.id], context.previous)
+      }
       push(`${t.common.error} ${t.common.retry}`, 'error')
     },
   })
