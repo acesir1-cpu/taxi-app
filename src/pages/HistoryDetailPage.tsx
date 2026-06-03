@@ -63,11 +63,9 @@ export function HistoryDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" asChild>
-          <Link to="/app/history">{t.common.back}</Link>
-        </Button>
-      </div>
+      <Button variant="secondary" className="w-full sm:w-auto" asChild>
+        <Link to="/app/history">{t.common.back}</Link>
+      </Button>
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
           <CardTitle>{t.history.detailTitle}</CardTitle>

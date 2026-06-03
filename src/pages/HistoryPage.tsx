@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { ChevronRight, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { strings } from '../i18n/strings'
 import type { AppOutletContext } from '../types/appContext'
 import type { Rating, Ride } from '../types/domain'
@@ -49,7 +49,7 @@ export function HistoryPage() {
     queryKey: ['complaints', me.account.id],
     queryFn: () => getComplaintsForPassenger(me.account.id),
   })
-  const historyHidden = hideHistoryInApp && rides.length === 0
+  const historyHidden = hideHistoryInApp
   const statsRides = useMemo(() => {
     if (historyHidden || historySaveDisabled) return []
     if (!pendingDeleteRide) return rides
@@ -327,6 +327,7 @@ export function HistoryPage() {
           setClearAllModalOpen(false)
           setClearAllStep(1)
           await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
+          await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
           push(t.history.clearAllSuccess, 'success')
         }}
       />
@@ -568,39 +569,54 @@ function RideHistoryCard({
   const complaint = complaintQ.data?.find((c) => c.rideId === ride.id)
   const rated = Boolean(ratingQ.data)
 
+  const detailPath = `/app/history/${ride.id}`
+
   return (
     <Card className="border-slate-200/90 transition-shadow duration-150 ease-out sm:hover:shadow-card-hover">
       <CardContent className="space-y-3 p-4 text-sm sm:p-5">
-        <div className="flex items-start justify-between gap-2">
-          <p className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-navy sm:text-base">
-            {ride.pickup.label} → {ride.destination.label}
-          </p>
-          <div className="flex shrink-0 items-center gap-2">
-            <RideStatusBadge status={ride.status} />
-            {ride.orderType === 'zakazano' ? (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
-                {t.order.schedule}
-              </span>
-            ) : null}
+        <Link
+          to={detailPath}
+          className="group -mx-1 block space-y-3 rounded-xl px-1 py-0.5 outline-none transition-colors hover:bg-slate-50 active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-brand-yellow"
+          aria-label={`${t.history.details}: ${ride.pickup.label} → ${ride.destination.label}`}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-navy transition-colors group-hover:text-brand-teal sm:text-base">
+              {ride.pickup.label} → {ride.destination.label}
+            </p>
+            <div className="flex shrink-0 items-center gap-2">
+              <RideStatusBadge status={ride.status} />
+              {ride.orderType === 'zakazano' ? (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                  {t.order.schedule}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-          <span className="h-px flex-1 bg-slate-200" />
-          <span className="inline-flex h-2 w-2 rounded-full bg-rose-500" />
-        </div>
-        <p className="text-[12px] font-medium text-slate-500">{formatBsDate(ride.createdAt)}</p>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-semibold tabular-nums text-brand-navy">
-            {(ride.finalPrice ?? ride.estimatedPrice).toFixed(2)} BAM
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            <span className="h-px flex-1 bg-slate-200" />
+            <span className="inline-flex h-2 w-2 rounded-full bg-rose-500" />
+          </div>
+          <p className="text-[12px] font-medium text-slate-500">{formatBsDate(ride.createdAt)}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold tabular-nums text-brand-navy">
+              {(ride.finalPrice ?? ride.estimatedPrice).toFixed(2)} BAM
+            </p>
+            {ride.paymentMethod === 'gotovina' ? <p className="text-xs font-medium text-slate-500">{t.order.cash}</p> : null}
+          </div>
+          {rated ? <p className="text-sm font-medium tabular-nums text-slate-700">⭐ {ratingQ.data!.stars}/5</p> : null}
+          {complaint ? (
+            <p className="text-xs font-semibold text-orange-700">{t.history.complaintProcessing}</p>
+          ) : null}
+          <p className="flex items-center gap-0.5 text-xs font-bold text-brand-teal">
+            {t.history.details}
+            <ChevronRight className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </p>
-          {ride.paymentMethod === 'gotovina' ? <p className="text-xs font-medium text-slate-500">{t.order.cash}</p> : null}
-        </div>
-        {rated ? <p className="text-sm font-medium tabular-nums text-slate-700">⭐ {ratingQ.data!.stars}/5</p> : null}
-        {complaint ? (
-          <p className="text-xs font-semibold text-orange-700">{t.history.complaintProcessing}</p>
-        ) : null}
+        </Link>
         <div className="flex items-center justify-between gap-2 overflow-x-auto pt-1 pb-1 sm:flex-wrap sm:overflow-visible">
+          <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" asChild>
+            <Link to={detailPath}>{t.history.details}</Link>
+          </Button>
           <button
             type="button"
             onClick={onRepeat}

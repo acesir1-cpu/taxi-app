@@ -167,17 +167,30 @@ export async function getRideHistory(passengerProfileId: string): Promise<Ride[]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
 }
 
+const PASSENGER_HISTORY_STATUSES: RideStatus[] = ['zavrsena', 'otkazana', 'neuspjesna']
+
+function passengerHasHistoryRides(db: ReturnType<typeof getDb>, passengerProfileId: string): boolean {
+  return db.rides.some(
+    (r) => r.passengerId === passengerProfileId && PASSENGER_HISTORY_STATUSES.includes(r.status)
+  )
+}
+
 export async function purgePassengerHistory(
   accountId: string,
-  _passengerProfileId: string
+  passengerProfileId: string
 ): Promise<{ ok: true }> {
   await delay(180)
   const db = getDb()
-  db.rides = []
-  db.rideRequests = []
+  const removedRideIds = new Set(
+    db.rides.filter((r) => r.passengerId === passengerProfileId).map((r) => r.id)
+  )
+  db.rides = db.rides.filter((r) => r.passengerId !== passengerProfileId)
+  db.rideRequests = db.rideRequests.filter((r) => r.passengerId !== passengerProfileId)
   db.passengerDemoHistoryCleared = true
-  db.ratings = []
-  db.complaints = []
+  db.ratings = db.ratings.filter((r) => r.passengerId !== passengerProfileId)
+  db.complaints = db.complaints.filter(
+    (c) => c.submittedByAccountId !== accountId || !c.rideId || !removedRideIds.has(c.rideId)
+  )
   db.notifications = db.notifications.filter((n) => {
     if (n.accountId !== accountId) return true
     if (String(n.type) === 'ride') return false
@@ -221,6 +234,9 @@ export async function deleteRideFromHistory(
   db.rideRequests = db.rideRequests.filter((r) => r.id !== ride.requestId)
   db.ratings = db.ratings.filter((r) => r.rideId !== rideId)
   db.complaints = db.complaints.filter((c) => c.rideId !== rideId)
+  if (!passengerHasHistoryRides(db, passengerProfileId)) {
+    db.passengerDemoHistoryCleared = true
+  }
   db.activityLogs.unshift({
     id: uid('log'),
     accountId,

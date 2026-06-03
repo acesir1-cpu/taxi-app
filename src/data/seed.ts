@@ -1258,23 +1258,27 @@ export function ensureDispatchData(db: MockDatabase): boolean {
     db.rides.push(structuredClone(dispatchActiveRide))
     changed = true
   }
-  if (!db.rideRequests.some((r) => r.id === dispatchAssignedRequest.id)) {
-    db.rideRequests.push(structuredClone(dispatchAssignedRequest))
-    changed = true
-  }
-  if (!db.rides.some((r) => r.id === dispatchAssignedRide.id)) {
-    db.rides.push(structuredClone(dispatchAssignedRide))
-    changed = true
+  if (!db.passengerDemoHistoryCleared) {
+    if (!db.rideRequests.some((r) => r.id === dispatchAssignedRequest.id)) {
+      db.rideRequests.push(structuredClone(dispatchAssignedRequest))
+      changed = true
+    }
+    if (!db.rides.some((r) => r.id === dispatchAssignedRide.id)) {
+      db.rides.push(structuredClone(dispatchAssignedRide))
+      changed = true
+    }
   }
   const nermin = db.drivers.find((d) => d.id === dispatchActiveRide.driverId)
   if (nermin && nermin.availabilityStatus === 'dostupan') {
     nermin.availabilityStatus = 'zauzet'
     changed = true
   }
-  const eldar = db.drivers.find((d) => d.id === dispatchAssignedRide.driverId)
-  if (eldar && eldar.availabilityStatus === 'dostupan') {
-    eldar.availabilityStatus = 'zauzet'
-    changed = true
+  if (!db.passengerDemoHistoryCleared) {
+    const eldar = db.drivers.find((d) => d.id === dispatchAssignedRide.driverId)
+    if (eldar && eldar.availabilityStatus === 'dostupan') {
+      eldar.availabilityStatus = 'zauzet'
+      changed = true
+    }
   }
   const scheduled3 = db.rideRequests.find((r) => r.id === 'req-seed-scheduled-3')
   if (scheduled3 && scheduled3.status === 'dodijeljen' && !scheduled3.rideId) {

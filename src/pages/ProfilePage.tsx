@@ -1003,6 +1003,7 @@ export function ProfilePage() {
                     setDeleteHistoryModal(false)
                     setDeleteHistoryStep(1)
                     await qc.invalidateQueries({ queryKey: ['history', me.profile.id] })
+                    await qc.invalidateQueries({ queryKey: ['activeRide', me.profile.id] })
                     push(
                       tr(
                         'Historija je obrisana iz aplikacije. Podaci se i dalje čuvaju 30 dana radi sigurnosti.',
