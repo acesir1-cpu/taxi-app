@@ -1,13 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom'
 import { LoadingState } from '../components/common/LoadingState'
 import { ReportShell } from '../components/reports/ReportShell'
 import { Button } from '../components/ui/button'
 import { strings } from '../i18n/strings'
+import {
+  type PassengerDocumentNavState,
+  resolvePassengerDocumentBackPath,
+} from '../lib/passengerDocumentNav'
 import { buildPassengerDocument, isExternalDocumentType } from '../services/reportApi'
+import { getRideById } from '../services/rideApi'
 import type { AppOutletContext } from '../types/appContext'
-
 export function PassengerDocumentPage() {
   const t = strings()
   const d = t.documents
@@ -15,8 +19,16 @@ export function PassengerDocumentPage() {
   const { docType, entityId } = useParams()
   const { me } = useOutletContext<AppOutletContext>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const returnToFromState = (location.state as PassengerDocumentNavState | null)?.returnTo
 
   const type = docType && isExternalDocumentType(docType) ? docType : null
+
+  const rideQ = useQuery({
+    queryKey: ['ride', entityId],
+    queryFn: () => getRideById(entityId!),
+    enabled: !!entityId && (type === 'invoice' || type === 'ride_confirmation'),
+  })
 
   const docQ = useQuery({
     queryKey: ['passengerDocument', type, entityId, me.account.id],
@@ -44,7 +56,11 @@ export function PassengerDocumentPage() {
     return <p className="text-sm text-slate-600">{d.notFound}</p>
   }
 
-  if (docQ.isLoading) return <LoadingState />
+  if (docQ.isLoading || rideQ.isLoading) return <LoadingState />
+
+  const backPath =
+    returnToFromState ??
+    (type && entityId ? resolvePassengerDocumentBackPath(type, entityId, rideQ.data) : '/app/history')
 
   const result = docQ.data
   if (!result) return <p className="text-sm text-slate-600">{d.notFound}</p>
@@ -58,7 +74,7 @@ export function PassengerDocumentPage() {
     return (
       <div className="space-y-3">
         <p className="text-sm text-slate-600">{msg}</p>
-        <Button variant="secondary" type="button" onClick={() => navigate(-1)}>
+        <Button variant="secondary" type="button" onClick={() => navigate(backPath)}>
           {d.back}
         </Button>
       </div>
@@ -70,15 +86,7 @@ export function PassengerDocumentPage() {
   return (
     <div className="passenger-document-page mx-auto max-w-3xl space-y-4 pb-2">
       <Button variant="secondary" size="sm" className="w-full sm:w-auto" asChild>
-        <Link
-          to={
-            type === 'booking_confirmation'
-              ? '/app/scheduled'
-              : type === 'invoice'
-                ? `/app/rate/${entityId}`
-                : `/app/history/${entityId}`
-          }
-        >
+        <Link to={backPath}>
           <ArrowLeft className="mr-1 h-4 w-4" />
           {d.back}
         </Link>

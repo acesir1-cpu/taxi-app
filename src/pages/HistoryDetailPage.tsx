@@ -148,9 +148,17 @@ export function HistoryDetailPage() {
           ) : null}
           <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:flex-wrap">
             {rideDetail.status === 'zavrsena' ? (
-              <PassengerInvoiceLink rideId={rideDetail.id} className="w-full sm:w-auto" />
+              <PassengerInvoiceLink
+                rideId={rideDetail.id}
+                returnTo={`/app/history/${rideDetail.id}`}
+                className="w-full sm:w-auto"
+              />
             ) : (
-              <PassengerRideConfirmationLink rideId={rideDetail.id} className="w-full sm:w-auto" />
+              <PassengerRideConfirmationLink
+                rideId={rideDetail.id}
+                returnTo={`/app/history/${rideDetail.id}`}
+                className="w-full sm:w-auto"
+              />
             )}
             <Button type="button" onClick={onRepeat}>
               {t.history.repeat}

@@ -435,6 +435,7 @@ export function RidePage() {
       {['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku'].includes(ride.status) ? (
         <PassengerRideConfirmationLink
           rideId={ride.id}
+          returnTo={`/app/ride/${ride.id}`}
           size="lg"
           className="ride-confirmation-btn w-full flex-1"
         />

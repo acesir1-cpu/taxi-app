@@ -23,7 +23,7 @@ function RideCompletedInvoiceCard({ rideId, priceBam }: { rideId: string; priceB
           <p className="mt-1 text-2xl font-extrabold tabular-nums text-brand-navy">{priceBam.toFixed(2)} BAM</p>
           <p className="mt-1 text-sm text-slate-600">{t.documents.invoiceHint}</p>
         </motion.div>
-        <PassengerInvoiceLink rideId={rideId} className="w-full" size="lg" />
+        <PassengerInvoiceLink rideId={rideId} returnTo={`/app/rate/${rideId}`} className="w-full" size="lg" />
       </CardContent>
     </Card>
   )
