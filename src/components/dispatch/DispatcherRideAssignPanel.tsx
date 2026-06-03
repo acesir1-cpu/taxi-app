@@ -11,7 +11,6 @@ import { DispatchDriverSuggestList } from './DispatchDriverSuggestList'
 import { useAiRouteEstimate } from '../../hooks/useAiRouteEstimate'
 import {
   assignRideToDriver,
-  isDispatchRideAwaitingAssignment,
   suggestDriversForRequest,
 } from '../../services/dispatcherApi'
 import type { DispatchRideRow } from '../../services/dispatcherApi'
@@ -39,8 +38,8 @@ export function DispatcherRideAssignPanel({
   const qc = useQueryClient()
   const push = useToastStore((s) => s.push)
 
-  const awaitingAssignment = Boolean(selectedRow && isDispatchRideAwaitingAssignment(selectedRow))
-  const requestId = awaitingAssignment ? selectedRow!.request.id : ''
+  const needsDriver = Boolean(selectedRow && !selectedRow.ride?.driverId)
+  const requestId = needsDriver ? (selectedRow?.request.id ?? '') : ''
 
   const suggestionsQ = useQuery({
     queryKey: ['dispatchDriverSuggestions', requestId],
@@ -49,8 +48,8 @@ export function DispatcherRideAssignPanel({
   })
 
   const aiQ = useAiRouteEstimate(
-    awaitingAssignment ? selectedRow?.request.pickup : undefined,
-    awaitingAssignment ? selectedRow?.request.destination : undefined,
+    needsDriver ? selectedRow?.request.pickup : undefined,
+    needsDriver ? selectedRow?.request.destination : undefined,
     {
       availableDrivers,
       orderType: selectedRow?.request.orderType,

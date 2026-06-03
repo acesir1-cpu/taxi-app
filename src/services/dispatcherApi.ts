@@ -181,7 +181,7 @@ const REASSIGNABLE_RIDE_STATUSES: RideStatus[] = ['dodijeljena', 'vozac_na_putu'
 export function isDispatchRideAwaitingAssignment(
   row: Pick<DispatchRideRow, 'ride' | 'request'>
 ): boolean {
-  if (row.ride) return false
+  if (row.ride?.driverId) return false
   return AWAITING_ASSIGNMENT_REQUEST_STATUSES.includes(row.request.status)
 }
 

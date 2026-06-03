@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl } from 'react-leaflet'
 import { fetchRoadRoute, getCachedRoadRoute, type LatLng } from '../../services/routingApi'
 import { cn } from '../../lib/utils'
-import type { DispatchDriverRow, DispatchRideRow } from '../../services/dispatcherApi'
+import { isDispatchRideAwaitingAssignment, type DispatchDriverRow, type DispatchRideRow } from '../../services/dispatcherApi'
 import type { Ride } from '../../types/domain'
 import { FitBounds } from '../map/FitBounds'
 
@@ -102,6 +102,7 @@ export function DispatchFleetMap({
   /** Fleet overview: hide overlapping lines when many rides; detail view: pass true */
   showRideRoutes?: boolean
 }) {
+  const awaitingRides = rides.filter(isDispatchRideAwaitingAssignment)
   const activeRides = rides.filter(
     (row) => row.ride && ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku', 'problematicna'].includes(row.ride.status),
   )
@@ -162,6 +163,14 @@ export function DispatchFleetMap({
         out.push([row.ride.destination.lat, row.ride.destination.lng])
       }
     }
+    for (const row of awaitingRides) {
+      if (isValidSarajevoCoord(row.request.pickup.lat, row.request.pickup.lng)) {
+        out.push([row.request.pickup.lat, row.request.pickup.lng])
+      }
+      if (isValidSarajevoCoord(row.request.destination.lat, row.request.destination.lng)) {
+        out.push([row.request.destination.lat, row.request.destination.lng])
+      }
+    }
     if (drawRoutes) {
       for (const line of routeLines.values()) {
         for (const pt of line) out.push(pt)
@@ -192,6 +201,19 @@ export function DispatchFleetMap({
             />
           ) : null
         })}
+        {awaitingRides.map((row) => (
+          <Marker
+            key={`${row.request.id}-await-pickup`}
+            position={[row.request.pickup.lat, row.request.pickup.lng]}
+            icon={pickupIcon}
+          >
+            <Popup>
+              <strong>{row.pickupLabel}</strong>
+              <br />
+              {row.passengerName} · čeka dodjelu
+            </Popup>
+          </Marker>
+        ))}
         {activeRides.map((row) =>
           row.ride ? (
             <Marker

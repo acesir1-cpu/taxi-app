@@ -131,6 +131,8 @@ export function DispatcherRidesPage() {
     if (param && RIDE_FILTERS.has(param as RideFilter)) {
       setFilter(param as RideFilter)
     }
+    const requestId = searchParams.get('request')
+    if (requestId) setSelectedRequestId(requestId)
   }, [searchParams])
 
   useEffect(() => {
@@ -138,6 +140,13 @@ export function DispatcherRidesPage() {
     const first = data.rides.find(isDispatchRideAwaitingAssignment)
     if (first) setSelectedRequestId(first.request.id)
   }, [filter, data])
+
+  useEffect(() => {
+    if (filter !== 'cekaju' || !selectedRequestId) return
+    window.requestAnimationFrame(() => {
+      document.getElementById('dispatch-assign-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [filter, selectedRequestId])
 
   useEffect(() => {
     if (location.hash !== '#phone-order') return
@@ -155,8 +164,12 @@ export function DispatcherRidesPage() {
     return locations.find((loc) => loc.id === id)
   }
 
-  function selectRow(requestId: string) {
+  function selectRow(requestId: string, scrollToAssign = false) {
     setSelectedRequestId(requestId)
+    if (!scrollToAssign) return
+    window.requestAnimationFrame(() => {
+      document.getElementById('dispatch-assign-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }
 
   return (
@@ -272,7 +285,7 @@ export function DispatcherRidesPage() {
                             <Button
                               size="sm"
                               variant={selected ? 'cta' : 'secondary'}
-                              onClick={() => selectRow(row.request.id)}
+                              onClick={() => selectRow(row.request.id, true)}
                             >
                               {c.assign}
                             </Button>
@@ -291,7 +304,7 @@ export function DispatcherRidesPage() {
         </Card>
       </section>
 
-      <aside className="space-y-4 xl:sticky xl:top-24 xl:self-start">
+      <aside id="dispatch-assign-panel" className="space-y-4 xl:sticky xl:top-24 xl:self-start">
         <DispatcherRideAssignPanel
           dispatcherAccountId={me.account.id}
           selectedRow={selectedRow}

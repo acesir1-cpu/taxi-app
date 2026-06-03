@@ -16,7 +16,11 @@ import { useLangRefresh } from '../hooks/useLangRefresh'
 import { strings } from '../i18n/strings'
 import { cn } from '../lib/utils'
 import { dispatchAnomalyLink } from '../lib/dispatchAnomalyLink'
-import { acknowledgeAnomaly, isDispatchRideAwaitingAssignment } from '../services/dispatcherApi'
+import {
+  acknowledgeAnomaly,
+  isDispatchRideAwaitingAssignment,
+  type DispatchRideRow,
+} from '../services/dispatcherApi'
 import { useDispatcherSession } from '../hooks/useDispatcherSession'
 
 type DashboardFilter = 'sve' | 'problematicne' | 'bez_voznje' | 'dostupan' | 'zauzet' | 'van_funkcije'
@@ -49,11 +53,27 @@ export function DispatcherDashboardPage() {
 
   const filteredDrivers = useMemo(() => {
     if (!data) return []
-    if (filter === 'bez_voznje') return data.drivers.filter((row) => !row.activeRide)
-    if (filter === 'dostupan' || filter === 'zauzet' || filter === 'van_funkcije') {
-      return data.drivers.filter((row) => row.driver.availabilityStatus === filter)
+    switch (filter) {
+      case 'bez_voznje':
+        return data.drivers.filter((row) => !row.activeRide)
+      case 'dostupan':
+      case 'zauzet':
+      case 'van_funkcije':
+        return data.drivers.filter((row) => row.driver.availabilityStatus === filter)
+      case 'problematicne': {
+        const driverIds = new Set(
+          data.rides
+            .filter((row) =>
+              ['problematicna', 'neuspjesna', 'neuspjesan', 'otkazana', 'otkazan'].includes(row.status),
+            )
+            .map((row) => row.ride?.driverId)
+            .filter((id): id is string => Boolean(id)),
+        )
+        return data.drivers.filter((row) => driverIds.has(row.driver.id))
+      }
+      default:
+        return data.drivers
     }
-    return data.drivers
   }, [data, filter])
 
   const waitingCount = useMemo(
@@ -63,10 +83,45 @@ export function DispatcherDashboardPage() {
 
   const filteredRides = useMemo(() => {
     if (!data) return []
-    if (filter === 'problematicne') {
-      return data.rides.filter((row) => row.status === 'problematicna' || row.status === 'neuspjesna' || row.status === 'neuspjesan')
+    const activeStatuses: Array<NonNullable<DispatchRideRow['ride']>['status']> = [
+      'dodijeljena',
+      'vozac_na_putu',
+      'stigao',
+      'u_toku',
+      'problematicna',
+    ]
+    switch (filter) {
+      case 'problematicne':
+        return data.rides.filter((row) =>
+          ['problematicna', 'neuspjesna', 'neuspjesan', 'otkazana', 'otkazan'].includes(row.status),
+        )
+      case 'bez_voznje':
+        return []
+      case 'dostupan': {
+        const ids = new Set(
+          data.drivers
+            .filter((row) => row.driver.availabilityStatus === 'dostupan')
+            .map((row) => row.driver.id),
+        )
+        return data.rides.filter((row) => row.ride?.driverId && ids.has(row.ride.driverId))
+      }
+      case 'zauzet': {
+        const ids = new Set(
+          data.drivers.filter((row) => row.driver.availabilityStatus === 'zauzet').map((row) => row.driver.id),
+        )
+        return data.rides.filter(
+          (row) => row.ride?.driverId && ids.has(row.ride.driverId) && activeStatuses.includes(row.ride.status),
+        )
+      }
+      case 'van_funkcije':
+        return []
+      default:
+        return data.rides.filter(
+          (row) =>
+            isDispatchRideAwaitingAssignment(row) ||
+            (row.ride != null && activeStatuses.includes(row.ride.status)),
+        )
     }
-    return data.rides.filter((row) => row.ride && ['dodijeljena', 'vozac_na_putu', 'stigao', 'u_toku', 'problematicna'].includes(row.ride.status))
   }, [data, filter])
 
   if (isPending && !data) return <LoadingState />
